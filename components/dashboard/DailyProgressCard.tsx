@@ -10,11 +10,12 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from "recharts";
+import type { ActiveDotProps } from "recharts";
 
 type ActiveLine = "pipes" | "pipeTarget" | "backfill" | "backfillTarget" | null;
 
 function createActiveDot(lineKey: ActiveLine, onActive: (k: ActiveLine) => void) {
-  return (props: { cx?: number; cy?: number; stroke?: string; [k: string]: unknown }) => {
+  return (props: ActiveDotProps) => {
     useEffect(() => {
       onActive(lineKey);
       return () => onActive(null);

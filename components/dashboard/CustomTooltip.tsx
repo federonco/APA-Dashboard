@@ -1,8 +1,9 @@
 "use client";
 
-import type { TooltipProps } from "recharts";
+import type { TooltipContentProps } from "recharts";
+import type { ValueType, NameType } from "recharts/types/component/DefaultTooltipContent";
 
-export function CustomTooltip({ active, payload, label }: TooltipProps<number, string>) {
+export function CustomTooltip({ active, payload, label }: Partial<TooltipContentProps<ValueType, NameType>>) {
   if (!active || !payload?.length) return null;
 
   const filtered = payload.filter(
@@ -31,7 +32,7 @@ export function CustomTooltip({ active, payload, label }: TooltipProps<number, s
       )}
       <div className="flex flex-col gap-1">
         {filtered.map((entry, i) => (
-          <div key={entry.dataKey ?? entry.name ?? i} className="flex items-center justify-between gap-4">
+          <div key={String(entry.dataKey ?? (typeof entry.name === "function" ? i : entry.name) ?? i)} className="flex items-center justify-between gap-4">
             <span
               className="font-normal"
               style={{ fontSize: "11px", color: "#7C7A86" }}

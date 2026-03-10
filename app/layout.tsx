@@ -1,17 +1,11 @@
 import type { Metadata } from "next";
-import { DM_Mono, Barlow_Condensed } from "next/font/google";
+import { Manrope } from "next/font/google";
 import "./globals.css";
 
-const dmMono = DM_Mono({
-  variable: "--font-dm-mono",
+const manrope = Manrope({
+  variable: "--font-manrope",
   subsets: ["latin"],
-  weight: ["400", "500"],
-});
-
-const barlowCondensed = Barlow_Condensed({
-  variable: "--font-heading",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["300", "400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -25,10 +19,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en">
       <body
-        className={`${dmMono.variable} ${barlowCondensed.variable} min-h-screen bg-[#080808] font-sans text-zinc-200 antialiased`}
-        style={{ fontFamily: "var(--font-dm-mono), ui-monospace, monospace" }}
+        className={`${manrope.variable} min-h-screen bg-[#F7F7F7] font-sans text-zinc-700 antialiased`}
+        style={{ fontFamily: "var(--font-manrope), ui-sans-serif, system-ui, sans-serif" }}
       >
         {children}
       </body>

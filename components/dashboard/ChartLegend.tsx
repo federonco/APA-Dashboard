@@ -29,7 +29,10 @@ export function ChartLegend({ items, className = "" }: ChartLegendProps) {
               strokeDasharray={item.dashed ? "4 2" : "none"}
             />
           </svg>
-          <span className="font-mono text-xs uppercase tracking-wider text-zinc-400">
+          <span
+            className="font-normal text-zinc-600"
+            style={{ fontSize: "11px" }}
+          >
             {item.label}
           </span>
         </div>

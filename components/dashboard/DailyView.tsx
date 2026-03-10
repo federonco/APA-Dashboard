@@ -43,7 +43,7 @@ export function DailyView({
 }: DailyViewProps) {
   return (
     <>
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <section className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-[1.6fr_0.72fr]">
         <DailyProgressCard
           pipeData={pipeProgress}
           backfillData={backfillProgress}
@@ -53,26 +53,20 @@ export function DailyView({
         <WaterConsumptionCard data={waterByActivity} />
       </section>
 
-      <div className="flex items-center gap-4 py-2">
-        <span className="font-mono text-xs uppercase tracking-widest text-zinc-500">
-          ── 5-Day Historic Trend
-        </span>
-      </div>
-
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <HistoricTrendCard
           data={last5Pipes}
-          title="Pipes / Day — Last 5 Working Days"
-          accentColor="#f97316"
-          accentColorDark="#9a3412"
+          title="Pipes / Day - Last 5 working days"
+          accentColor="#D06A3A"
+          accentColorDark="#c45a26"
           unit="pipes"
           valueLabel="Pipes"
         />
         <HistoricTrendCard
           data={last5Backfill}
-          title="Backfill / Day — Last 5 Working Days"
-          accentColor="#a78bfa"
-          accentColorDark="#6d28d9"
+          title="Backfill / Day - Last 5 working days"
+          accentColor="#4F7FB3"
+          accentColorDark="#3a7ab8"
           unit="m"
           valueLabel="Metres"
         />

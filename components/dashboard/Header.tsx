@@ -7,27 +7,43 @@ export function Header() {
   });
 
   return (
-    <header className="border-b border-[#1e1e1e] px-6 py-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-heading text-2xl font-semibold tracking-tight text-white">
+    <header className="border-b border-[#E2E0E6] bg-[#F7F7F7] py-5 px-10">
+      <div className="flex items-start justify-between gap-6">
+        <div className="min-w-0">
+          <h1
+            className="font-semibold tracking-tight text-zinc-800"
+            style={{ fontSize: "22px", lineHeight: "28px" }}
+          >
             Acueducto DN1600
           </h1>
-          <p className="font-mono text-sm uppercase tracking-widest text-zinc-400">
-            CH 0+000 → 27+000 · Water Corp
+          <p
+            className="mt-1 font-normal text-zinc-600"
+            style={{ fontSize: "13px", lineHeight: "18px" }}
+          >
+            Water Corp • CH 0+000 → 27+000
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-shrink-0 items-center gap-6">
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs font-medium"
+            style={{
+              backgroundColor: "#E7F4EC",
+              borderColor: "#CFE8DA",
+              color: "#2F7D55",
+            }}
+          >
             <span
-              className="h-2 w-2 animate-pulse rounded-full bg-emerald-500"
-              title="Live"
+              className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
+              style={{ backgroundColor: "#2F7D55" }}
             />
-            <span className="font-mono text-xs uppercase tracking-wider text-zinc-500">
-              Live
-            </span>
-          </div>
-          <span className="font-mono text-sm text-zinc-400">{today}</span>
+            Live
+          </span>
+          <span
+            className="font-normal text-zinc-600"
+            style={{ fontSize: "13px", lineHeight: "18px" }}
+          >
+            {today}
+          </span>
         </div>
       </div>
     </header>

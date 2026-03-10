@@ -9,9 +9,9 @@ const TREND_CONFIG: Record<
   Trend,
   { label: string; color: string; bgColor: string; arrow: string }
 > = {
-  up: { label: "up", color: "text-emerald-400", bgColor: "bg-emerald-500/20", arrow: "↑" },
-  down: { label: "down", color: "text-red-400", bgColor: "bg-red-500/20", arrow: "↓" },
-  flat: { label: "flat", color: "text-amber-400", bgColor: "bg-amber-500/20", arrow: "→" },
+  up: { label: "up", color: "text-emerald-700", bgColor: "bg-emerald-100", arrow: "↑" },
+  down: { label: "down", color: "text-red-700", bgColor: "bg-red-100", arrow: "↓" },
+  flat: { label: "flat", color: "text-amber-700", bgColor: "bg-amber-100", arrow: "→" },
 };
 
 export function TrendBadge({ trend, percentChange }: TrendBadgeProps) {
@@ -21,7 +21,8 @@ export function TrendBadge({ trend, percentChange }: TrendBadgeProps) {
 
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded px-2 py-0.5 font-mono text-xs font-medium uppercase tracking-wider ${config.bgColor} ${config.color}`}
+      className={`inline-flex items-center gap-1 rounded px-2 py-0.5 font-semibold ${config.bgColor} ${config.color}`}
+            style={{ fontSize: "16px" }}
     >
       <span>{config.arrow}</span>
       <span>{displayPercent}</span>

@@ -7,6 +7,8 @@ import {
 } from "@/lib/queries/daily";
 import { Header } from "@/components/dashboard/Header";
 import { NavTabs } from "@/components/dashboard/NavTabs";
+import { KPISummary } from "@/components/dashboard/KPISummary";
+import { ProjectProgress } from "@/components/dashboard/ProjectProgress";
 import { DailyView } from "@/components/dashboard/DailyView";
 
 export default async function DailyViewPage() {
@@ -20,11 +22,13 @@ export default async function DailyViewPage() {
     ]);
 
   return (
-    <div className="min-h-screen bg-[#080808]">
+    <div className="min-h-screen bg-[#F7F7F7]">
       <Header />
       <NavTabs />
 
-      <main className="max-w-6xl mx-auto px-6 py-8 space-y-8">
+      <main className="w-full px-10 py-8 space-y-8">
+        <KPISummary />
+        <ProjectProgress />
         <DailyView
           pipeProgress={pipeProgress}
           backfillProgress={backfillProgress}

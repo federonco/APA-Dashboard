@@ -1,0 +1,75 @@
+{
+  "theme": {
+    "background": "#F7F7F7",
+    "card": "#FFFFFF",
+    "border": "#E5E7EB"
+  },
+
+  "text": {
+    "primary": "#111827",
+    "secondary": "#6B7280",
+    "muted": "#9CA3AF"
+  },
+
+  "status": {
+    "live": "#22C55E",
+    "progressBar": "#3B3B45"
+  },
+
+  "charts": {
+    "pipeLaid": "#E46A3C",
+    "backfill": "#4A79A8",
+    "pipeTarget": "#E46A3C",
+    "backfillTarget": "#4A79A8"
+  },
+
+  "waterChart": {
+    "pipeJointing": "#3C3566",
+    "dustSuppression": "#5E548E",
+    "testing": "#B9B5D6",
+    "other": "#D6D6DD"
+  },
+
+  "radius": {
+    "card": "12px",
+    "badge": "8px"
+  },
+
+  "spacing": {
+    "section": "32px",
+    "cardPadding": "20px",
+    "gap": "16px"
+  },
+
+  "typography": {
+    "fontFamily": "Inter, system-ui, sans-serif",
+    "title": "22px",
+    "subtitle": "14px",
+    "kpi": "28px",
+    "body": "14px",
+    "label": "12px"
+  },
+
+  "components": {
+    "kpiCard": {
+      "height": "96px",
+      "background": "card",
+      "border": "border",
+      "radius": "card"
+    },
+
+    "progressBar": {
+      "height": "8px",
+      "background": "#E5E7EB",
+      "fill": "progressBar",
+      "radius": "999px"
+    },
+
+    "badge": {
+      "background": "live",
+      "text": "#FFFFFF",
+      "padding": "4px 10px",
+      "radius": "badge"
+    }
+  }
+}

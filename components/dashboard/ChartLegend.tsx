@@ -30,8 +30,8 @@ export function ChartLegend({ items, className = "" }: ChartLegendProps) {
             />
           </svg>
           <span
-            className="font-normal text-zinc-600"
-            style={{ fontSize: "11px" }}
+            className="font-mono uppercase text-[#999]"
+            style={{ fontSize: "10px", letterSpacing: "0.04em" }}
           >
             {item.label}
           </span>

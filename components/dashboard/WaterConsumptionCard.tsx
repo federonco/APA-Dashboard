@@ -4,15 +4,16 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import type { WaterByActivity } from "@/lib/queries/daily";
 import { CustomTooltip } from "./CustomTooltip";
 
+/* APA accent colors for water activities */
 const COLOR_MAP: Record<string, string> = {
-  "Pipe jointing": "#4A3F6B",
-  "Dust suppression": "#7B6FA6",
-  Testing: "#DAD6EA",
-  Other: "#C9C7CF",
-  default: "#71717a",
+  "Pipe jointing": "#f97316",
+  "Dust suppression": "#38bdf8",
+  Testing: "#4ade80",
+  Other: "#facc15",
+  default: "#0ea5e9",
 };
 
-const FALLBACK_COLORS = ["#4A3F6B", "#7B6FA6", "#DAD6EA", "#C9C7CF"];
+const FALLBACK_COLORS = ["#f97316", "#38bdf8", "#4ade80", "#facc15", "#0ea5e9"];
 
 function getColor(activity: string, index: number): string {
   return COLOR_MAP[activity] ?? FALLBACK_COLORS[index % FALLBACK_COLORS.length];
@@ -33,17 +34,17 @@ export function WaterConsumptionCard({ data }: WaterConsumptionCardProps) {
   }));
 
   return (
-    <div className="min-h-[26rem] rounded-lg border border-[#1e1e1e] bg-[#0e0e0e]">
+    <div className="min-h-[26rem] rounded-lg border border-[#1e1e1e] border-t-4 border-t-[#0ea5e9] bg-[#0e0e0e]">
       <div className="flex h-full min-h-[26rem] flex-col p-5 py-6">
         <div className="mb-3 flex items-start justify-between">
           <span
             className="font-barlow font-medium text-[#999]"
             style={{ fontSize: "13px", letterSpacing: "0.02em" }}
           >
-            Water consuption - today
+            WATER CONSUMPTION — TODAY
           </span>
           <span
-            className="rounded bg-[#1e1e1e] px-2 py-1 font-dm-mono font-semibold text-white"
+            className="rounded bg-[#1e1e1e] px-2 py-1 font-mono font-semibold text-white"
             style={{ fontSize: "16px", lineHeight: "1.2" }}
           >
             {totalKL} kL
@@ -88,9 +89,9 @@ export function WaterConsumptionCard({ data }: WaterConsumptionCardProps) {
                           style={{ backgroundColor: entry.color }}
                         />
                       </td>
-                      <td className="py-0.5 pr-4 text-left text-zinc-600">{entry.name}</td>
-                      <td className="py-0.5 pr-2 text-right text-zinc-700 tabular-nums">{kL} kL</td>
-                      <td className="py-0.5 text-right text-zinc-500 tabular-nums">({pct}%)</td>
+                      <td className="py-0.5 pr-4 text-left text-[#999]">{entry.name}</td>
+                      <td className="py-0.5 pr-2 text-right text-white tabular-nums">{kL} kL</td>
+                      <td className="py-0.5 text-right text-[#666] tabular-nums">({pct}%)</td>
                     </tr>
                   );
                 })}

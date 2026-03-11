@@ -1,15 +1,19 @@
 import type { Metadata } from "next";
-import { Barlow_Condensed } from "next/font/google";
+import { Inter, Geist } from "next/font/google";
+import { tokens } from "@/lib/designTokens";
 import "./globals.css";
+import { cn } from "@/lib/utils";
 
-const barlow = Barlow_Condensed({
-  variable: "--font-barlow",
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
-  weight: ["400", "600", "700"],
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
-  title: "OnSite Dashboard — Alkimos Pipeline Alliance DN1600",
+  title: "Alkimos Pipeline Alliance - DN1600 Trunk Main",
   description: "Engineering dashboard for Water Corp DN1600 MSCL pipeline",
 };
 
@@ -19,14 +23,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={cn("font-sans", geist.variable)}>
       <body
-        className={`${barlow.variable} min-h-screen bg-[#080808] font-sans text-sm text-white antialiased`}
+        className={`${inter.variable} min-h-screen antialiased`}
         style={{
-          fontFamily:
-            "ui-sans-serif, system-ui, sans-serif",
-          ["--font-barlow" as string]: "var(--font-barlow)",
-          ["--font-dm-mono" as string]: "ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, monospace",
+          background: tokens.theme.background,
+          fontFamily: tokens.typography.fontFamily,
+          color: tokens.text.primary,
+          fontSize: tokens.typography.body,
         }}
       >
         {children}

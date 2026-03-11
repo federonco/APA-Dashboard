@@ -20,11 +20,6 @@ const WaterConsumptionCard = dynamic(
   { ssr: false }
 );
 
-const HistoricTrendCard = dynamic(
-  () =>
-    import("./HistoricTrendCard").then((m) => m.HistoricTrendCard),
-  { ssr: false }
-);
 
 type DailyViewProps = {
   pipeProgress: HourlyPipeProgress[];
@@ -53,24 +48,6 @@ export function DailyView({
         <WaterConsumptionCard data={waterByActivity} />
       </section>
 
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <HistoricTrendCard
-          data={last5Pipes}
-          title="Pipes / Day - Last 5 working days"
-          accentColor="#D06A3A"
-          accentColorDark="#c45a26"
-          unit="pipes"
-          valueLabel="Pipes"
-        />
-        <HistoricTrendCard
-          data={last5Backfill}
-          title="Backfill / Day - Last 5 working days"
-          accentColor="#4F7FB3"
-          accentColorDark="#3a7ab8"
-          unit="m"
-          valueLabel="Metres"
-        />
-      </section>
     </>
   );
 }

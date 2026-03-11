@@ -39,8 +39,8 @@ import type { HourlyPipeProgress, HourlyBackfillProgress } from "@/lib/queries/d
 const PIPE_TARGET = 18;
 const BACKFILL_TARGET = 80;
 const HOURS = ["07", "08", "09", "10", "11", "12", "13", "14", "15", "16", "17"];
-const PIPE_COLOR = "#D06A3A";
-const BACKFILL_COLOR = "#4F7FB3";
+const PIPE_COLOR = "#f97316";
+const BACKFILL_COLOR = "#38bdf8";
 
 type DailyProgressCardProps = {
   pipeData: HourlyPipeProgress[];
@@ -93,17 +93,17 @@ export function DailyProgressCard({
   const activeDotBackfillTarget = useMemo(() => createActiveDot("backfillTarget", setActiveLine), []);
 
   return (
-    <div className="flex h-full min-h-0 flex-col rounded-lg border border-[#1e1e1e] bg-[#0e0e0e]">
+    <div className="flex h-full min-h-0 flex-col rounded-lg border border-[#1e1e1e] border-t-4 border-t-[#f97316] bg-[#0e0e0e]">
       <div className="flex min-h-0 flex-1 flex-col p-5">
         <div className="mb-3 flex flex-shrink-0 items-start justify-between">
           <span
             className="font-barlow font-medium text-[#999]"
             style={{ fontSize: "13px", letterSpacing: "0.02em" }}
           >
-            Daily progress - cumulative
+            DAILY PROGRESS — CUMULATIVE
           </span>
           <span
-            className="rounded bg-[#1e1e1e] px-2 py-1 font-dm-mono font-semibold text-white"
+            className="rounded bg-[#1e1e1e] px-2 py-1 font-mono font-semibold text-white"
             style={{ fontSize: "16px", lineHeight: "1.2" }}
           >
             {pipesActual} pipes / {metresActual} m
@@ -121,16 +121,16 @@ export function DailyProgressCard({
                 strokeWidth={1}
                 vertical={false}
               />
-              <Tooltip content={<CustomTooltip />} cursor={{ stroke: "#ECEAF1", strokeWidth: 1 }} />
+              <Tooltip content={<CustomTooltip />} cursor={{ stroke: "#1e1e1e", strokeWidth: 1 }} />
               <XAxis
                 dataKey="shortHour"
-                tick={{ fill: "#6b7280", fontSize: 11, fontFamily: "var(--font-manrope), ui-sans-serif, system-ui, sans-serif", fontWeight: 400 }}
-                axisLine={{ stroke: "#D6D4DC" }}
+                tick={{ fill: "#999", fontSize: 11, fontFamily: "var(--font-dm-mono), ui-monospace, monospace", fontWeight: 400 }}
+                axisLine={{ stroke: "#1e1e1e" }}
                 tickLine={false}
               />
               <YAxis
                 yAxisId="left"
-                tick={{ fill: "#6b7280", fontSize: 11, fontFamily: "var(--font-manrope), ui-sans-serif, system-ui, sans-serif", fontWeight: 400 }}
+                tick={{ fill: "#999", fontSize: 11, fontFamily: "var(--font-dm-mono), ui-monospace, monospace", fontWeight: 400 }}
                 axisLine={false}
                 tickLine={false}
                 width={28}
@@ -138,7 +138,7 @@ export function DailyProgressCard({
               <YAxis
                 yAxisId="right"
                 orientation="right"
-                tick={{ fill: "#6b7280", fontSize: 11, fontFamily: "var(--font-manrope), ui-sans-serif, system-ui, sans-serif", fontWeight: 400 }}
+                tick={{ fill: "#999", fontSize: 11, fontFamily: "var(--font-dm-mono), ui-monospace, monospace", fontWeight: 400 }}
                 axisLine={false}
                 tickLine={false}
                 width={28}

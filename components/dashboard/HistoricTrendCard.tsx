@@ -50,11 +50,11 @@ export function HistoricTrendCard({
 );
 
   return (
-    <div className="rounded-lg border border-[#1e1e1e] bg-[#0e0e0e]">
+    <div className="rounded-lg border border-[#EEECEF] bg-[#FCFBFB]">
       <div className="p-5">
         <div className="mb-3 flex items-start justify-between">
           <span
-            className="font-barlow font-medium text-[#999]"
+            className="font-medium text-zinc-600"
             style={{ fontSize: "13px", letterSpacing: "0.02em" }}
           >
             {title}
@@ -76,12 +76,12 @@ export function HistoricTrendCard({
               <Tooltip content={<CustomTooltip />} cursor={{ stroke: "#ECEAF1", strokeWidth: 1 }} />
               <XAxis
                 dataKey="day"
-                tick={{ fill: "#6b7280", fontSize: 11, fontFamily: "var(--font-manrope), ui-sans-serif, system-ui, sans-serif", fontWeight: 400 }}
+                tick={{ fill: "#6b7280", fontSize: 11, fontFamily: "var(--font-dm-mono), ui-monospace, monospace", fontWeight: 400 }}
                 axisLine={{ stroke: "#D6D4DC" }}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fill: "#6b7280", fontSize: 11, fontFamily: "var(--font-manrope), ui-sans-serif, system-ui, sans-serif", fontWeight: 400 }}
+                tick={{ fill: "#6b7280", fontSize: 11, fontFamily: "var(--font-dm-mono), ui-monospace, monospace", fontWeight: 400 }}
                 axisLine={false}
                 tickLine={false}
                 width={28}

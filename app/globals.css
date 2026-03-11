@@ -1,17 +1,19 @@
 @import "tailwindcss";
 
 :root {
-  --background: #F7F7F7;
-  --foreground: #3f3f46;
-  --card-bg: #FCFBFB;
-  --border: #E8E6EB;
+  --background: #080808;
+  --foreground: #ffffff;
+  --card-bg: #0e0e0e;
+  --border: #1e1e1e;
+  --muted: #999999;
+  --accent-pipe: #f97316;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-mono: var(--font-manrope);
-  --font-heading: var(--font-manrope);
+  --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, monospace;
+  --font-heading: var(--font-barlow), ui-sans-serif, system-ui, sans-serif;
 }
 
 body {
@@ -19,10 +21,15 @@ body {
   color: var(--foreground);
 }
 
-.font-heading {
-  font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+.font-barlow {
+  font-family: var(--font-barlow), ui-sans-serif, system-ui, sans-serif;
 }
 
-.font-mono {
-  font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+.font-heading {
+  font-family: var(--font-barlow), ui-sans-serif, system-ui, sans-serif;
+}
+
+.font-mono,
+.font-dm-mono {
+  font-family: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, monospace;
 }

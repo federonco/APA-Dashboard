@@ -33,17 +33,17 @@ export function WaterConsumptionCard({ data }: WaterConsumptionCardProps) {
   }));
 
   return (
-    <div className="rounded-lg border border-[#EEECEF] bg-[#FCFBFB] min-h-[26rem]">
+    <div className="min-h-[26rem] rounded-lg border border-[#1e1e1e] bg-[#0e0e0e]">
       <div className="flex h-full min-h-[26rem] flex-col p-5 py-6">
         <div className="mb-3 flex items-start justify-between">
           <span
-            className="font-medium text-zinc-600"
+            className="font-barlow font-medium text-[#999]"
             style={{ fontSize: "13px", letterSpacing: "0.02em" }}
           >
             Water consuption - today
           </span>
           <span
-            className="rounded bg-zinc-200/80 px-2 py-1 font-semibold text-zinc-800"
+            className="rounded bg-[#1e1e1e] px-2 py-1 font-dm-mono font-semibold text-white"
             style={{ fontSize: "16px", lineHeight: "1.2" }}
           >
             {totalKL} kL

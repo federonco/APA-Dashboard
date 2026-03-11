@@ -1,25 +1,61 @@
-const TABS = ["Daily", "Progress", "Resources", "Reports"] as const;
+"use client";
 
-export function NavTabs() {
+import Link from "next/link";
+
+interface Props {
+  crew: string;
+  view: string;
+}
+
+interface CrewTab {
+  name: string;
+  label: string;
+  enabled: boolean;
+}
+
+const CREW_TABS: CrewTab[] = [
+  { name: "A", label: "Crew A", enabled: true },
+  { name: "B", label: "Crew B", enabled: false },
+  { name: "C", label: "Crew C", enabled: false },
+  { name: "D", label: "Crew D", enabled: false },
+  { name: "Global", label: "Global", enabled: false },
+];
+
+export function NavTabs({ crew, view }: Props) {
   return (
-    <nav className="border-b border-[#E2E0E6] bg-[#F7F7F7] px-10">
-      <ul className="flex gap-8">
-        {TABS.map((tab, i) => (
-          <li key={tab}>
-            <button
-              type="button"
-              className={`font-medium transition-colors ${
-                i === 0
-                  ? "border-b-2 border-[#f97316] text-zinc-800"
-                  : "border-b-2 border-transparent text-zinc-500 hover:text-zinc-700"
-              }`}
-              style={{ fontSize: "13px", paddingBottom: "0.75rem", marginBottom: -1 }}
-            >
-              {tab}
-            </button>
-          </li>
+    <div className="overflow-x-auto border-b border-[#1e1e1e] px-6 py-4">
+      <div className="flex gap-2">
+        {CREW_TABS.map((tab) => (
+          <div key={tab.name} className="relative">
+            {tab.enabled ? (
+              <Link
+                href={`/?crew=${tab.name}&view=${view}`}
+                className={`inline-block border-b-2 px-4 py-2 font-barlow text-sm font-bold uppercase transition ${
+                  crew === tab.name
+                    ? "border-b-[#f97316] text-[#f97316]"
+                    : "border-b-transparent text-[#999] hover:text-white"
+                }`}
+              >
+                {tab.label}
+              </Link>
+            ) : (
+              <button
+                type="button"
+                disabled
+                className="cursor-not-allowed border-b-2 border-b-transparent px-4 py-2 font-barlow text-sm font-bold uppercase text-[#666]"
+              >
+                {tab.label}
+              </button>
+            )}
+
+            {!tab.enabled && (
+              <span className="absolute -right-1 -top-3 rounded bg-[#f97316] px-2 py-0.5 font-barlow text-xs font-bold text-white">
+                Soon
+              </span>
+            )}
+          </div>
         ))}
-      </ul>
-    </nav>
+      </div>
+    </div>
   );
 }

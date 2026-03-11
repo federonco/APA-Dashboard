@@ -7,15 +7,15 @@ type KPICardProps = {
 
 function KPICard({ label, value, trend, trendPositive }: KPICardProps) {
   return (
-    <div className="rounded-lg border border-[#EEECEF] bg-[#FCFBFB] p-5">
+    <div className="rounded-lg border border-[#1e1e1e] bg-[#0e0e0e] p-5">
       <p
-        className="mb-1 font-medium text-zinc-600"
+        className="mb-1 font-barlow font-medium text-[#999]"
         style={{ fontSize: "11px", letterSpacing: "0.04em", textTransform: "uppercase" }}
       >
         {label}
       </p>
       <p
-        className="font-semibold text-zinc-800"
+        className="font-dm-mono font-semibold text-white"
         style={{ fontSize: "28px", lineHeight: "1.2" }}
       >
         {value}
@@ -25,7 +25,7 @@ function KPICard({ label, value, trend, trendPositive }: KPICardProps) {
           className="mt-1 font-normal"
           style={{
             fontSize: "11px",
-            color: trendPositive === true ? "#2F7D55" : trendPositive === false ? "#b91c1c" : "#71717a",
+            color: trendPositive === true ? "#4ade80" : trendPositive === false ? "#f87171" : "#999",
           }}
         >
           {trend}

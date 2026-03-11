@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
-import { Manrope } from "next/font/google";
+import { Barlow_Condensed } from "next/font/google";
 import "./globals.css";
 
-const manrope = Manrope({
-  variable: "--font-manrope",
+const barlow = Barlow_Condensed({
+  variable: "--font-barlow",
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
+  weight: ["400", "600", "700"],
 });
 
 export const metadata: Metadata = {
-  title: "OnSite Dashboard — Acueducto DN1600",
+  title: "OnSite Dashboard — Alkimos Pipeline Alliance DN1600",
   description: "Engineering dashboard for Water Corp DN1600 MSCL pipeline",
 };
 
@@ -21,8 +21,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${manrope.variable} min-h-screen bg-[#F7F7F7] font-sans text-zinc-700 antialiased`}
-        style={{ fontFamily: "var(--font-manrope), ui-sans-serif, system-ui, sans-serif" }}
+        className={`${barlow.variable} min-h-screen bg-[#080808] font-sans text-sm text-white antialiased`}
+        style={{
+          fontFamily:
+            "ui-sans-serif, system-ui, sans-serif",
+          ["--font-barlow" as string]: "var(--font-barlow)",
+          ["--font-dm-mono" as string]: "ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, monospace",
+        }}
       >
         {children}
       </body>

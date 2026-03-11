@@ -50,11 +50,11 @@ export function HistoricTrendCard({
 );
 
   return (
-    <div className="rounded-lg border border-[#EEECEF] bg-[#FCFBFB]">
+    <div className="rounded-lg border border-[#1e1e1e] bg-[#0e0e0e]">
       <div className="p-5">
         <div className="mb-3 flex items-start justify-between">
           <span
-            className="font-medium text-zinc-600"
+            className="font-barlow font-medium text-[#999]"
             style={{ fontSize: "13px", letterSpacing: "0.02em" }}
           >
             {title}

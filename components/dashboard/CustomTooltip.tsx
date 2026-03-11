@@ -17,15 +17,15 @@ export function CustomTooltip({ active, payload, label }: Partial<TooltipContent
     <div
       className="rounded-lg border px-[10px] py-2 shadow-sm"
       style={{
-        backgroundColor: "#FCFBFB",
-        borderColor: "#EEECEF",
-        fontFamily: "var(--font-manrope), ui-sans-serif, system-ui, sans-serif",
+        backgroundColor: "#080808",
+        borderColor: "#1e1e1e",
+        fontFamily: "var(--font-barlow), ui-sans-serif, system-ui, sans-serif",
       }}
     >
       {label != null && (
         <p
           className="mb-1.5 font-medium"
-          style={{ fontSize: "11px", color: "#7C7A86" }}
+          style={{ fontSize: "11px", color: "#999" }}
         >
           {label}
         </p>
@@ -35,13 +35,13 @@ export function CustomTooltip({ active, payload, label }: Partial<TooltipContent
           <div key={String(entry.dataKey ?? (typeof entry.name === "function" ? i : entry.name) ?? i)} className="flex items-center justify-between gap-4">
             <span
               className="font-normal"
-              style={{ fontSize: "11px", color: "#7C7A86" }}
+              style={{ fontSize: "11px", color: "#999" }}
             >
               {entry.name}
             </span>
             <span
               className="font-medium tabular-nums"
-              style={{ fontSize: "12px", color: entry.color ?? (entry.payload as { color?: string })?.color ?? "#3f3f46" }}
+              style={{ fontSize: "12px", color: entry.color ?? (entry.payload as { color?: string })?.color ?? "#fff" }}
             >
               {typeof entry.value === "number"
                 ? entry.value.toLocaleString()

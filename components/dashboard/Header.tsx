@@ -1,6 +1,8 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
+import { tokens } from "@/lib/designTokens";
 
 interface Props {
   crew: string;
@@ -21,35 +23,69 @@ export function Header({ crew }: Props) {
   });
 
   return (
-    <header className="sticky top-0 z-40 border-b border-[#1e1e1e] bg-[#0a0a0a]">
-      <div className="flex items-start justify-between gap-6 px-6 py-5">
+    <header
+      style={{
+        background: tokens.theme.card,
+        borderBottom: `1px solid ${tokens.theme.border}`,
+        padding: tokens.spacing.cardPadding,
+      }}
+    >
+      <div
+        className="flex items-start justify-between gap-6"
+        style={{ padding: `0 ${tokens.spacing.gap}` }}
+      >
         <div className="min-w-0">
           <h1
-            className="font-barlow text-xl font-bold uppercase tracking-tight text-white sm:text-2xl"
-            style={{ lineHeight: "28px" }}
+            style={{
+              fontSize: tokens.typography.title,
+              fontWeight: 700,
+              color: tokens.text.primary,
+              letterSpacing: "-0.02em",
+              lineHeight: 1.2,
+            }}
           >
             Alkimos Pipeline Alliance
           </h1>
           <p
-            className="mt-1 font-mono text-[#999]"
-            style={{ fontSize: "13px", lineHeight: "18px" }}
+            style={{
+              marginTop: 4,
+              fontSize: tokens.typography.subtitle,
+              color: tokens.text.secondary,
+              lineHeight: 1.3,
+            }}
           >
             DN1600 Trunk Main
           </p>
         </div>
         <div className="flex flex-shrink-0 items-center gap-6">
-          <span
-            className="inline-flex items-center gap-1.5 rounded-full border border-[#1e1e1e] bg-[#0e0e0e] px-2 py-1 font-mono text-xs text-[#4ade80]"
-          >
-            <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[#4ade80]" />
+          <Badge variant="live" className="gap-1.5">
+            <span
+              className="size-1.5 shrink-0 rounded-full bg-[#2F7D55]"
+              aria-hidden
+            />
             Live
-          </span>
-          <span className="font-mono text-[#999]" style={{ fontSize: "13px", lineHeight: "18px" }}>
+          </Badge>
+          <span
+            style={{
+              fontSize: tokens.typography.subtitle,
+              color: tokens.text.secondary,
+              lineHeight: 1.3,
+            }}
+          >
             {today}
           </span>
           <a
             href={toggleUrl}
-            className="rounded-lg border border-[#1e1e1e] bg-[#1a1a1a] px-4 py-2 font-barlow text-sm font-bold uppercase text-white transition hover:border-[#f97316]"
+            style={{
+              padding: "8px 16px",
+              fontSize: tokens.typography.body,
+              fontWeight: 600,
+              color: tokens.text.primary,
+              background: tokens.theme.card,
+              border: `1px solid ${tokens.theme.border}`,
+              borderRadius: tokens.radius.card,
+              textDecoration: "none",
+            }}
           >
             📊 {isSpreadsheet ? "Dashboard" : "Data View"}
           </a>

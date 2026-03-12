@@ -1,26 +1,23 @@
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { tokens } from "@/lib/designTokens";
+
 type ScheduleStatus = "ahead" | "behind" | "on-schedule";
 
 function ScheduleIndicator({ status, delta }: { status: ScheduleStatus; delta?: number }) {
   if (status === "on-schedule") {
     return (
-      <span
-        className="inline-flex items-baseline gap-1 font-normal"
-        style={{ fontSize: "12px", color: "#999", fontFamily: "var(--font-dm-mono), ui-sans-serif, system-ui, sans-serif" }}
-      >
+      <span style={{ fontSize: tokens.typography.label, color: tokens.text.muted }}>
         On schedule
       </span>
     );
   }
   const isAhead = status === "ahead";
-  const color = isAhead ? "#4ade80" : "#f87171";
+  const color = isAhead ? tokens.status.live : "#ef4444";
   const arrow = isAhead ? "↑" : "↓";
   const sign = isAhead ? "+" : "−";
   return (
-    <span
-      className="inline-flex items-baseline gap-1 font-normal"
-      style={{ fontSize: "12px", color, fontFamily: "var(--font-dm-mono), ui-sans-serif, system-ui, sans-serif" }}
-    >
-      <span style={{ fontSize: "10px", lineHeight: 1 }}>{arrow}</span>
+    <span style={{ fontSize: tokens.typography.label, color }}>
+      <span style={{ fontSize: 10, lineHeight: 1 }}>{arrow}</span>
       {sign}{Math.abs(delta ?? 0)}% {isAhead ? "ahead" : "behind"} of plan
     </span>
   );
@@ -32,40 +29,78 @@ export function ProjectProgress() {
   const planned = 120;
   const scheduleStatus: ScheduleStatus = "ahead";
   const scheduleDelta = 4;
+  const pb = tokens.components.progressBar;
 
   return (
-    <div className="rounded-lg border border-[#1e1e1e] border-t-4 border-t-[#f97316] bg-[#0e0e0e] p-5">
-      <p
-        className="mb-3 font-barlow font-medium text-[#999]"
-        style={{ fontSize: "11px", letterSpacing: "0.04em", textTransform: "uppercase" }}
-      >
-        Project Progress
-      </p>
-      <div className="mb-2 h-2 w-full overflow-hidden rounded-full" style={{ backgroundColor: "#1e1e1e" }}>
+    <Card
+      style={{
+        background: tokens.theme.card,
+        border: `1px solid ${tokens.theme.border}`,
+        borderRadius: tokens.radius.card,
+        padding: tokens.spacing.cardPadding,
+        marginBottom: tokens.spacing.gap,
+      }}
+    >
+      <CardHeader style={{ padding: 0, marginBottom: 12 }}>
+        <p
+          style={{
+            fontSize: tokens.typography.label,
+            fontWeight: 500,
+            color: tokens.text.secondary,
+            letterSpacing: "0.04em",
+            textTransform: "uppercase",
+          }}
+        >
+          Project Progress
+        </p>
+      </CardHeader>
+      <CardContent style={{ padding: 0 }}>
         <div
-          className="h-full rounded-full transition-[width] duration-300"
-          style={{ backgroundColor: "#f97316", width: `${percent}%` }}
-        />
-      </div>
-      <div className="flex flex-col gap-1">
-        <div className="flex items-baseline justify-between gap-4">
-          <p
-            className="font-mono font-semibold text-white"
-            style={{ fontSize: "15px", lineHeight: "1.2", fontFamily: "var(--font-dm-mono), ui-sans-serif, system-ui, sans-serif" }}
-          >
-            {percent}% complete
-          </p>
+          style={{
+            width: "100%",
+            height: pb.height,
+            background: pb.background,
+            borderRadius: pb.radius,
+            overflow: "hidden",
+            marginBottom: 8,
+          }}
+        >
+          <div
+            style={{
+              height: "100%",
+              width: `${percent}%`,
+              background: pb.fill,
+              borderRadius: pb.radius,
+              transition: "width 0.3s ease",
+            }}
+          />
         </div>
-        <div className="flex items-baseline justify-between gap-4">
-          <ScheduleIndicator status={scheduleStatus} delta={scheduleDelta} />
-          <p
-            className="font-mono text-[#999]"
-            style={{ fontSize: "11px", fontFamily: "var(--font-dm-mono), ui-sans-serif, system-ui, sans-serif" }}
-          >
-            {installed} pipes installed / {planned} planned
-          </p>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-baseline justify-between gap-4">
+            <p
+              style={{
+                fontSize: tokens.typography.subtitle,
+                fontWeight: 600,
+                color: tokens.text.primary,
+                lineHeight: 1.2,
+              }}
+            >
+              {percent}% complete
+            </p>
+          </div>
+          <div className="flex items-baseline justify-between gap-4">
+            <ScheduleIndicator status={scheduleStatus} delta={scheduleDelta} />
+            <p
+              style={{
+                fontSize: tokens.typography.label,
+                color: tokens.text.muted,
+              }}
+            >
+              {installed} pipes installed / {planned} planned
+            </p>
+          </div>
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

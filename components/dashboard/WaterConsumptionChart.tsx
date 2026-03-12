@@ -1,0 +1,178 @@
+"use client";
+
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { tokens } from "@/lib/designTokens";
+import { CustomTooltip } from "./CustomTooltip";
+import type { WaterByActivity } from "@/lib/queries/daily";
+
+const ACTIVITY_COLOR_MAP: Record<string, string> = {
+  "Pipe jointing": tokens.waterChart.pipeJointing,
+  "Dust suppression": tokens.waterChart.dustSuppression,
+  Testing: tokens.waterChart.testing,
+  Other: tokens.waterChart.other,
+};
+
+const FALLBACK_COLORS = [
+  tokens.waterChart.pipeJointing,
+  tokens.waterChart.dustSuppression,
+  tokens.waterChart.testing,
+  tokens.waterChart.other,
+];
+
+function getColor(activity: string, index: number): string {
+  return ACTIVITY_COLOR_MAP[activity] ?? FALLBACK_COLORS[index % FALLBACK_COLORS.length];
+}
+
+type Props = {
+  data: WaterByActivity[];
+};
+
+export function WaterConsumptionChart({ data }: Props) {
+  const totalLitres = data.reduce((sum, d) => sum + d.litres, 0);
+  const totalKL = (totalLitres / 1000).toFixed(1);
+
+  const chartData = data.map((d, i) => ({
+    name: d.activity,
+    value: d.litres,
+    color: getColor(d.activity, i),
+  }));
+
+  return (
+    <Card
+      style={{
+        background: tokens.theme.card,
+        border: `1px solid ${tokens.theme.border}`,
+        borderRadius: tokens.radius.card,
+        padding: tokens.spacing.cardPadding,
+      }}
+    >
+      <CardHeader
+        style={{
+          padding: 0,
+          marginBottom: 12,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+        }}
+      >
+        <span
+          style={{
+            fontSize: tokens.typography.subtitle,
+            fontWeight: 500,
+            color: tokens.text.secondary,
+            letterSpacing: "0.02em",
+          }}
+        >
+          WATER CONSUMPTION — TODAY
+        </span>
+        <span
+          style={{
+            borderRadius: tokens.radius.badge,
+            background: tokens.theme.border,
+            padding: "4px 8px",
+            fontSize: tokens.typography.body,
+            fontWeight: 600,
+            color: tokens.text.primary,
+          }}
+        >
+          {totalKL} kL
+        </span>
+      </CardHeader>
+      <CardContent style={{ padding: 0 }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 16,
+          }}
+        >
+          <div style={{ height: 192, width: 192, flexShrink: 0 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Tooltip
+                  content={<CustomTooltip />}
+                  offset={100}
+                  wrapperStyle={{ outline: "none" }}
+                />
+                <Pie
+                  data={chartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={48}
+                  outerRadius={77}
+                  paddingAngle={2}
+                  dataKey="value"
+                >
+                  {chartData.map((entry) => (
+                    <Cell key={entry.name} fill={entry.color} />
+                  ))}
+                </Pie>
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              fontSize: tokens.typography.label,
+            }}
+          >
+            <tbody>
+              {chartData.map((entry) => {
+                const pct =
+                  totalLitres > 0 ? ((entry.value / totalLitres) * 100).toFixed(1) : "0";
+                const kL = (entry.value / 1000).toFixed(1);
+                return (
+                  <tr key={entry.name}>
+                    <td style={{ padding: "2px 8px 2px 0", verticalAlign: "middle", width: 1 }}>
+                      <span
+                        style={{
+                          display: "inline-block",
+                          width: 8,
+                          height: 8,
+                          borderRadius: "50%",
+                          background: entry.color,
+                        }}
+                      />
+                    </td>
+                    <td
+                      style={{
+                        padding: "2px 16px 2px 0",
+                        textAlign: "left",
+                        color: tokens.text.secondary,
+                      }}
+                    >
+                      {entry.name}
+                    </td>
+                    <td
+                      style={{
+                        padding: "2px 8px 2px 0",
+                        textAlign: "right",
+                        color: tokens.text.primary,
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    >
+                      {kL} kL
+                    </td>
+                    <td
+                      style={{
+                        padding: "2px 0",
+                        textAlign: "right",
+                        color: tokens.text.muted,
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    >
+                      ({pct}%)
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

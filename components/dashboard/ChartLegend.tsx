@@ -1,3 +1,5 @@
+import { tokens } from "@/lib/designTokens";
+
 export type LegendItem = {
   label: string;
   color: string;
@@ -30,8 +32,13 @@ export function ChartLegend({ items, className = "" }: ChartLegendProps) {
             />
           </svg>
           <span
-            className="font-mono uppercase text-[#999]"
-            style={{ fontSize: "10px", letterSpacing: "0.04em" }}
+            className="uppercase"
+            style={{
+              fontSize: tokens.typography.label,
+              letterSpacing: "0.04em",
+              color: tokens.text.muted,
+              fontFamily: tokens.typography.fontFamily,
+            }}
           >
             {item.label}
           </span>

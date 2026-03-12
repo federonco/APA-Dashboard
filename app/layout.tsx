@@ -1,10 +1,6 @@
 import type { Metadata } from "next";
-import { Inter, Geist } from "next/font/google";
-import { tokens } from "@/lib/designTokens";
+import { Inter } from "next/font/google";
 import "./globals.css";
-import { cn } from "@/lib/utils";
-
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 const inter = Inter({
   variable: "--font-inter",
@@ -23,16 +19,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("font-sans", geist.variable)}>
-      <body
-        className={`${inter.variable} min-h-screen antialiased`}
-        style={{
-          background: tokens.theme.background,
-          fontFamily: tokens.typography.fontFamily,
-          color: tokens.text.primary,
-          fontSize: tokens.typography.body,
-        }}
-      >
+    <html lang="en" className={inter.variable}>
+      <body className={`${inter.variable} min-h-screen antialiased`}>
         {children}
       </body>
     </html>

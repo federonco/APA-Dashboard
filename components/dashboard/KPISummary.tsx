@@ -1,20 +1,30 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { tokens } from "@/lib/designTokens";
+import { PIPE_LENGTH_M } from "@/lib/constants";
 
-const KPI_ITEMS = [
-  { label: "Pipes Installed Today", value: "22" },
-  { label: "Backfill Today", value: "80 m" },
-  { label: "Water Used Today", value: "28.0 kL" },
-  { label: "Productivity", value: "+33%" },
-];
+type Props = {
+  pipesCount?: number;
+  backfillMeters?: number;
+  waterKL?: number;
+};
 
-export function KPISummary() {
+export function KPISummary({
+  pipesCount = 0,
+  backfillMeters = 0,
+  waterKL = 0,
+}: Props) {
+  const pipeMeters = (pipesCount ?? 0) * PIPE_LENGTH_M;
+  const items: { label: string; value: string; subValue?: string }[] = [
+    { label: "Pipes Installed Today", value: String(pipesCount), subValue: `${pipeMeters.toFixed(1)} m` },
+    { label: "Backfill Today", value: `${backfillMeters} m` },
+    { label: "Water Used Today", value: `${waterKL} kL` },
+  ];
   return (
     <section
-      className="grid grid-cols-4 gap-4"
+      className="grid grid-cols-3 gap-4"
       style={{ marginBottom: tokens.spacing.gap }}
     >
-      {KPI_ITEMS.map((item) => (
+      {items.map((item) => (
         <Card
           key={item.label}
           className="justify-center"
@@ -52,6 +62,18 @@ export function KPISummary() {
             >
               {item.value}
             </p>
+            {item.subValue && (
+              <p
+                style={{
+                  marginTop: 2,
+                  fontSize: tokens.typography.label,
+                  color: tokens.text.secondary,
+                  fontWeight: 500,
+                }}
+              >
+                {item.subValue}
+              </p>
+            )}
           </CardContent>
         </Card>
       ))}

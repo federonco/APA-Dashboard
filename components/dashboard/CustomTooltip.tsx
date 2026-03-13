@@ -15,11 +15,16 @@ export function CustomTooltip({ active, payload, label }: Partial<TooltipContent
 
   return (
     <div
-      className="rounded-lg border border-[#1e1e1e] bg-[#080808] px-3 py-2 shadow-lg"
-      style={{ fontFamily: "var(--font-barlow), ui-sans-serif, system-ui, sans-serif" }}
+      className="rounded-lg border px-3 py-2 shadow-md"
+      style={{
+        fontFamily: "DM Mono, monospace",
+        backgroundColor: "#ffffff",
+        borderColor: "#1e293b",
+        borderWidth: 1,
+      }}
     >
       {label != null && (
-        <p className="mb-1.5 font-barlow text-xs font-medium uppercase tracking-wide text-[#999]">
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: "#1e293b" }}>
           {label}
         </p>
       )}
@@ -29,10 +34,10 @@ export function CustomTooltip({ active, payload, label }: Partial<TooltipContent
             key={String(entry.dataKey ?? (typeof entry.name === "function" ? i : entry.name) ?? i)}
             className="flex items-center justify-between gap-6"
           >
-            <span className="font-barlow text-xs text-[#999]">{entry.name}</span>
+            <span className="text-xs" style={{ color: "#475569" }}>{entry.name}</span>
             <span
-              className="font-mono text-sm font-medium tabular-nums"
-              style={{ color: entry.color ?? (entry.payload as { color?: string })?.color ?? "#fff" }}
+              className="text-sm font-medium tabular-nums"
+              style={{ color: entry.color ?? (entry.payload as { color?: string })?.color ?? "#1e293b" }}
             >
               {typeof entry.value === "number"
                 ? entry.value.toLocaleString()

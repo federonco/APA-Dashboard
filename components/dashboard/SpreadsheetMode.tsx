@@ -62,13 +62,19 @@ export function SpreadsheetMode({ data, crew }: SpreadsheetModeProps) {
     win.close();
   }
 
+  const tableStyles = "overflow-x-auto rounded-lg border border-[#EEECEF] bg-[#FCFBFB]";
+  const thStyles = "px-4 py-2 text-left text-[11px] font-medium text-zinc-600";
+  const tdStyles = "px-4 py-2 text-[13px] text-zinc-800";
+  const emptyTdStyles = "px-4 py-6 text-center text-[13px] text-zinc-500";
+  const sectionTitleStyles = "text-[11px] font-medium uppercase tracking-wider text-zinc-600";
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <select
           value={period}
           onChange={(e) => setPeriod(e.target.value as PeriodFilter)}
-          className="rounded border border-[#1e1e1e] bg-[#0e0e0e] px-3 py-2 font-mono text-sm text-white"
+          className="rounded-lg border border-[#EEECEF] bg-[#FCFBFB] px-3 py-2 text-[13px] text-zinc-800"
         >
           <option value="day">Day</option>
           <option value="week">Week</option>
@@ -78,57 +84,43 @@ export function SpreadsheetMode({ data, crew }: SpreadsheetModeProps) {
 
       <section className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="font-barlow text-sm font-bold uppercase tracking-wider text-[#999]">
+          <h2 className={sectionTitleStyles}>
             OnSite-D (Pipes)
           </h2>
           <button
             type="button"
             onClick={() => printTable(dRef, "OnSite-D Pipes")}
-            className="rounded border border-[#1e1e1e] px-3 py-1 font-mono text-xs text-[#999] hover:bg-[#1e1e1e] hover:text-white"
+            className="rounded-lg border border-[#EEECEF] px-3 py-1 text-[11px] text-zinc-600 hover:bg-[#ECEAF1] hover:text-zinc-800"
           >
             Print OnSite-D
           </button>
         </div>
-        <div
-          ref={dRef}
-          className="overflow-x-auto rounded border border-[#1e1e1e] bg-[#0e0e0e]"
-        >
+        <div ref={dRef} className={tableStyles}>
           <table className="w-full min-w-[400px]">
             <thead>
-              <tr className="border-b border-[#1e1e1e]">
-                <th className="px-4 py-2 text-left font-mono text-xs text-[#999]">
-                  Date
-                </th>
-                <th className="px-4 py-2 text-left font-mono text-xs text-[#999]">
-                  Section
-                </th>
-                <th className="px-4 py-2 text-right font-mono text-xs text-[#999]">
-                  Pipes Laid
-                </th>
-                <th className="px-4 py-2 text-left font-mono text-xs text-[#999]">
-                  Crew
-                </th>
+              <tr className="border-b border-[#EEECEF]">
+                <th className={thStyles}>Date</th>
+                <th className={thStyles}>Time lodged</th>
+                <th className={thStyles}>Section</th>
+                <th className={`${thStyles} text-right`}>Pipes Laid</th>
+                <th className={thStyles}>Crew</th>
               </tr>
             </thead>
             <tbody>
               {filtered.onsiteD.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={4}
-                    className="px-4 py-6 text-center font-mono text-sm text-[#666]"
-                  >
+                  <td colSpan={5} className={emptyTdStyles}>
                     No data
                   </td>
                 </tr>
               ) : (
                 filtered.onsiteD.map((row, i) => (
-                  <tr key={i} className="border-b border-[#1e1e1e]/50">
-                    <td className="px-4 py-2 font-mono text-sm">{formatDate(row.date)}</td>
-                    <td className="px-4 py-2 font-mono text-sm">{row.section}</td>
-                    <td className="px-4 py-2 text-right font-mono text-sm">
-                      {row.pipes_laid}
-                    </td>
-                    <td className="px-4 py-2 font-mono text-sm">{row.crew}</td>
+                  <tr key={i} className="border-b border-[#EEECEF]/70">
+                    <td className={tdStyles}>{formatDate(row.date)}</td>
+                    <td className={tdStyles}>{row.time_lodged ?? "—"}</td>
+                    <td className={tdStyles}>{row.section}</td>
+                    <td className={`${tdStyles} text-right tabular-nums`}>{row.pipes_laid}</td>
+                    <td className={tdStyles}>{row.crew}</td>
                   </tr>
                 ))
               )}
@@ -139,57 +131,43 @@ export function SpreadsheetMode({ data, crew }: SpreadsheetModeProps) {
 
       <section className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="font-barlow text-sm font-bold uppercase tracking-wider text-[#999]">
+          <h2 className={sectionTitleStyles}>
             OnSite-B (Backfill)
           </h2>
           <button
             type="button"
             onClick={() => printTable(bRef, "OnSite-B Backfill")}
-            className="rounded border border-[#1e1e1e] px-3 py-1 font-mono text-xs text-[#999] hover:bg-[#1e1e1e] hover:text-white"
+            className="rounded-lg border border-[#EEECEF] px-3 py-1 text-[11px] text-zinc-600 hover:bg-[#ECEAF1] hover:text-zinc-800"
           >
             Print OnSite-B
           </button>
         </div>
-        <div
-          ref={bRef}
-          className="overflow-x-auto rounded border border-[#1e1e1e] bg-[#0e0e0e]"
-        >
+        <div ref={bRef} className={tableStyles}>
           <table className="w-full min-w-[400px]">
             <thead>
-              <tr className="border-b border-[#1e1e1e]">
-                <th className="px-4 py-2 text-left font-mono text-xs text-[#999]">
-                  Date
-                </th>
-                <th className="px-4 py-2 text-left font-mono text-xs text-[#999]">
-                  Section
-                </th>
-                <th className="px-4 py-2 text-right font-mono text-xs text-[#999]">
-                  Backfill (m³)
-                </th>
-                <th className="px-4 py-2 text-left font-mono text-xs text-[#999]">
-                  Crew
-                </th>
+              <tr className="border-b border-[#EEECEF]">
+                <th className={thStyles}>Date</th>
+                <th className={thStyles}>Time lodged</th>
+                <th className={thStyles}>Section</th>
+                <th className={`${thStyles} text-right`}>Backfill (m³)</th>
+                <th className={thStyles}>Crew</th>
               </tr>
             </thead>
             <tbody>
               {filtered.onsiteB.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={4}
-                    className="px-4 py-6 text-center font-mono text-sm text-[#666]"
-                  >
+                  <td colSpan={5} className={emptyTdStyles}>
                     No data
                   </td>
                 </tr>
               ) : (
                 filtered.onsiteB.map((row, i) => (
-                  <tr key={i} className="border-b border-[#1e1e1e]/50">
-                    <td className="px-4 py-2 font-mono text-sm">{formatDate(row.date)}</td>
-                    <td className="px-4 py-2 font-mono text-sm">{row.section}</td>
-                    <td className="px-4 py-2 text-right font-mono text-sm">
-                      {row.backfill_m3}
-                    </td>
-                    <td className="px-4 py-2 font-mono text-sm">{row.crew}</td>
+                  <tr key={i} className="border-b border-[#EEECEF]/70">
+                    <td className={tdStyles}>{formatDate(row.date)}</td>
+                    <td className={tdStyles}>{row.time_lodged ?? "—"}</td>
+                    <td className={tdStyles}>{row.section}</td>
+                    <td className={`${tdStyles} text-right tabular-nums`}>{row.backfill_m3}</td>
+                    <td className={tdStyles}>{row.crew}</td>
                   </tr>
                 ))
               )}
@@ -200,61 +178,45 @@ export function SpreadsheetMode({ data, crew }: SpreadsheetModeProps) {
 
       <section className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="font-barlow text-sm font-bold uppercase tracking-wider text-[#999]">
+          <h2 className={sectionTitleStyles}>
             OnSite-W (Water)
           </h2>
           <button
             type="button"
             onClick={() => printTable(wRef, "OnSite-W Water")}
-            className="rounded border border-[#1e1e1e] px-3 py-1 font-mono text-xs text-[#999] hover:bg-[#1e1e1e] hover:text-white"
+            className="rounded-lg border border-[#EEECEF] px-3 py-1 text-[11px] text-zinc-600 hover:bg-[#ECEAF1] hover:text-zinc-800"
           >
             Print OnSite-W
           </button>
         </div>
-        <div
-          ref={wRef}
-          className="overflow-x-auto rounded border border-[#1e1e1e] bg-[#0e0e0e]"
-        >
+        <div ref={wRef} className={tableStyles}>
           <table className="w-full min-w-[400px]">
             <thead>
-              <tr className="border-b border-[#1e1e1e]">
-                <th className="px-4 py-2 text-left font-mono text-xs text-[#999]">
-                  Date
-                </th>
-                <th className="px-4 py-2 text-left font-mono text-xs text-[#999]">
-                  Location
-                </th>
-                <th className="px-4 py-2 text-right font-mono text-xs text-[#999]">
-                  Water (m³)
-                </th>
-                <th className="px-4 py-2 text-left font-mono text-xs text-[#999]">
-                  Destination
-                </th>
-                <th className="px-4 py-2 text-left font-mono text-xs text-[#999]">
-                  Crew
-                </th>
+              <tr className="border-b border-[#EEECEF]">
+                <th className={thStyles}>Date</th>
+                <th className={thStyles}>Time lodged</th>
+                <th className={thStyles}>Location</th>
+                <th className={`${thStyles} text-right`}>Water (L)</th>
+                <th className={thStyles}>Destination</th>
+                <th className={thStyles}>Truck ID</th>
               </tr>
             </thead>
             <tbody>
               {filtered.onsiteW.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={5}
-                    className="px-4 py-6 text-center font-mono text-sm text-[#666]"
-                  >
+                  <td colSpan={6} className={emptyTdStyles}>
                     No data
                   </td>
                 </tr>
               ) : (
                 filtered.onsiteW.map((row, i) => (
-                  <tr key={i} className="border-b border-[#1e1e1e]/50">
-                    <td className="px-4 py-2 font-mono text-sm">{formatDate(row.date)}</td>
-                    <td className="px-4 py-2 font-mono text-sm">{row.location}</td>
-                    <td className="px-4 py-2 text-right font-mono text-sm">
-                      {row.water_m3}
-                    </td>
-                    <td className="px-4 py-2 font-mono text-sm">{row.destination}</td>
-                    <td className="px-4 py-2 font-mono text-sm">{row.crew}</td>
+                  <tr key={i} className="border-b border-[#EEECEF]/70">
+                    <td className={tdStyles}>{formatDate(row.date)}</td>
+                    <td className={tdStyles}>{row.time_lodged ?? "—"}</td>
+                    <td className={tdStyles}>{row.location}</td>
+                    <td className={`${tdStyles} text-right tabular-nums`}>{row.water_litres}</td>
+                    <td className={tdStyles}>{row.destination}</td>
+                    <td className={tdStyles}>{row.truck_id ?? "—"}</td>
                   </tr>
                 ))
               )}

@@ -1,49 +1,70 @@
+import Image from "next/image";
 import packageJson from "../../package.json";
 import { tokens } from "@/lib/designTokens";
 
 export function Footer() {
-  const year = new Date().getFullYear();
-  const version = packageJson.version;
+  const today = new Date().toLocaleDateString("en-CA", {
+    timeZone: "Australia/Perth",
+  });
 
   return (
     <footer
       style={{
         borderTop: `1px solid ${tokens.theme.border}`,
-        background: tokens.theme.card,
-        padding: "16px 24px",
+        padding: "1rem 2rem",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "0.5rem",
+        background: tokens.theme.background,
       }}
     >
-      <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 sm:flex-row">
-        <div className="flex items-center gap-3">
-          <span
-            style={{
-              fontSize: tokens.typography.body,
-              fontWeight: 700,
-              textTransform: "uppercase",
-              color: tokens.text.secondary,
-            }}
-          >
-            Alkimos Pipeline Alliance
-          </span>
-          <span style={{ color: tokens.text.muted }}>|</span>
-          <span
-            style={{
-              fontSize: tokens.typography.label,
-              color: tokens.text.muted,
-            }}
-          >
-            © {year} APA
-          </span>
-        </div>
-        <div
+      <a
+        href="https://readx.com.au"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="opacity-70 transition-opacity hover:opacity-100"
+      >
+        <Image
+          src="/readx-logo.png"
+          alt="readX"
+          width={48}
+          height={14}
+          style={{ height: "14px", width: "auto" }}
+        />
+      </a>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "0.5rem",
+          fontSize: "0.65rem",
+          fontFamily: "'DM Mono', monospace",
+          color: tokens.text.muted,
+        }}
+      >
+        <span
           style={{
-            fontSize: tokens.typography.label,
-            color: tokens.text.muted,
+            fontFamily: "'Barlow Condensed', sans-serif",
+            fontWeight: 600,
+            letterSpacing: "0.05em",
           }}
         >
-          v{version} · {new Date().toISOString().split("T")[0]}
-        </div>
+          ALKIMOS PIPELINE ALLIANCE
+        </span>
+        <span>|</span>
+        <span>© 2026 APA</span>
       </div>
+      <span
+        style={{
+          fontFamily: "'DM Mono', monospace",
+          fontSize: "0.65rem",
+          color: tokens.text.muted,
+        }}
+      >
+        v{packageJson.version} · {today}
+      </span>
     </footer>
   );
 }

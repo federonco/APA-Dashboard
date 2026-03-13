@@ -27,7 +27,7 @@ export function Footer() {
         className="opacity-70 transition-opacity hover:opacity-100"
       >
         <Image
-          src="/readx-logo.png"
+          src="/readx.logo.png"
           alt="readX"
           width={48}
           height={14}

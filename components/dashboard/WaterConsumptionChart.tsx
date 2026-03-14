@@ -40,6 +40,7 @@ export function WaterConsumptionChart({ data }: Props) {
 
   return (
     <Card
+      className="h-full flex flex-col"
       style={{
         background: tokens.theme.card,
         border: `1px solid ${tokens.theme.border}`,
@@ -79,14 +80,9 @@ export function WaterConsumptionChart({ data }: Props) {
           {totalKL} kL
         </span>
       </CardHeader>
-      <CardContent style={{ padding: 0 }}>
+      <CardContent style={{ padding: 0 }} className="flex-1 flex flex-col min-h-0">
         <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 16,
-          }}
+          className="flex-1 flex flex-col justify-center items-center gap-4 min-h-0"
         >
           <div style={{ height: 192, width: 192, flexShrink: 0 }}>
             <ResponsiveContainer width="100%" height="100%">

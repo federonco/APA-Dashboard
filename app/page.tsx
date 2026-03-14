@@ -1,23 +1,25 @@
 import {
   getCrewId,
-  getTodayPipeProgress,
-  getTodayBackfillProgress,
   getTodayWaterByActivity,
-  getLast5DaysPipes,
-  getLast5DaysBackfill,
   fetchPipesToday,
   fetchBackfillToday,
   fetchWaterToday,
+  getCurrentMonthDailyProgress,
+  getChainageProgressData,
+  getSectionsForCrew,
+  getSectionChainageProgress,
 } from "@/lib/queries/daily";
 import { getSpreadsheetData } from "@/lib/queries/spreadsheet";
 import { Header } from "@/components/dashboard/Header";
 import { NavTabs } from "@/components/dashboard/NavTabs";
 import { KPISummary } from "@/components/dashboard/KPISummary";
-import { ProjectProgress } from "@/components/dashboard/ProjectProgress";
-import { DailyProgressChart } from "@/components/dashboard/DailyProgressChart";
+import { SectionProgress } from "@/components/dashboard/SectionProgress";
+import { MonthlyProgressChart } from "@/components/dashboard/MonthlyProgressChart";
 import { WaterConsumptionChart } from "@/components/dashboard/WaterConsumptionChart";
-import { HistoricTrendSection } from "@/components/dashboard/HistoricTrendSection";
+import { ChainageProgressChart } from "@/components/dashboard/ChainageProgressChart";
+import { DaySelector } from "@/components/dashboard/DaySelector";
 import { tokens } from "@/lib/designTokens";
+import { toWorkingDay } from "@/lib/utils/workingDays";
 import { SpreadsheetMode } from "@/components/dashboard/SpreadsheetMode";
 import { Footer } from "@/components/dashboard/Footer";
 import { CREW_TABS } from "@/lib/constants/crew-tabs";
@@ -35,6 +37,10 @@ export default async function Page({ searchParams }: Props) {
   const params = await searchParams;
   const crew = (params?.crew as string) || "A";
   const view = (params?.view as string) || "dashboard";
+  const rawDate =
+    (params?.date as string) ||
+    new Date().toLocaleDateString("en-CA", { timeZone: "Australia/Perth" });
+  const selectedDate = toWorkingDay(rawDate);
   const crewForQueries = crew === "Global" ? "A" : crew;
   const crewId = await getCrewId(crewForQueries);
 
@@ -42,25 +48,29 @@ export default async function Page({ searchParams }: Props) {
     pipesTodayRes,
     backfillTodayRes,
     waterTodayRes,
-    pipeProgress,
-    backfillProgress,
     waterByActivity,
-    last5Pipes,
-    last5Backfill,
+    currentMonthProgress,
+    chainageProgressData,
   ] = await Promise.all([
-    fetchPipesToday(crewId ?? undefined),
-    fetchBackfillToday(crewId ?? undefined),
-    fetchWaterToday(crewId ?? undefined),
-    getTodayPipeProgress(crewId ?? undefined),
-    getTodayBackfillProgress(crewId ?? undefined),
-    getTodayWaterByActivity(crewId ?? undefined),
-    getLast5DaysPipes(crewId ?? undefined),
-    getLast5DaysBackfill(crewId ?? undefined),
+    fetchPipesToday(crewId ?? undefined, selectedDate),
+    fetchBackfillToday(crewId ?? undefined, selectedDate),
+    fetchWaterToday(crewId ?? undefined, selectedDate),
+    getTodayWaterByActivity(crewId ?? undefined, selectedDate),
+    getCurrentMonthDailyProgress(crewId ?? undefined),
+    getChainageProgressData(crewId ?? undefined),
   ]);
 
   const isCrewEnabled = CREW_TABS.find((t) => t.name === crew)?.enabled ?? false;
   const spreadsheetData =
     isCrewEnabled && view === "spreadsheet" ? await getSpreadsheetData(crew) : null;
+
+  const sections = crewId ? await getSectionsForCrew(crewId) : [];
+  const progressBySection: Record<string, Awaited<ReturnType<typeof getSectionChainageProgress>>> = {};
+  await Promise.all(
+    sections.map(async (s) => {
+      progressBySection[s.id] = await getSectionChainageProgress(s.id);
+    })
+  );
 
   return (
     <div
@@ -91,25 +101,25 @@ export default async function Page({ searchParams }: Props) {
           <SpreadsheetMode data={spreadsheetData} crew={crew} />
         ) : (
           <>
+            <DaySelector currentDate={rawDate} />
             <KPISummary
               pipesCount={pipesTodayRes.data.count}
               backfillMeters={backfillTodayRes.data.meters}
               waterKL={waterTodayRes.data.totalKL}
             />
-            <ProjectProgress />
+            <SectionProgress sections={sections} progressBySection={progressBySection} />
             <div
-              className="grid grid-cols-2 gap-6"
+              className="grid grid-cols-3 gap-6 items-stretch"
               style={{ gap: tokens.spacing.gap }}
             >
-              <DailyProgressChart
-                pipeData={pipeProgress}
-                backfillData={backfillProgress}
-                pipeTarget={18}
-                backfillTarget={80}
-              />
-              <WaterConsumptionChart data={waterByActivity} />
+              <div className="col-span-2 h-full">
+                <MonthlyProgressChart data={currentMonthProgress} />
+              </div>
+              <div className="col-span-1 h-full">
+                <WaterConsumptionChart data={waterByActivity} />
+              </div>
             </div>
-            <HistoricTrendSection last5Pipes={last5Pipes} last5Backfill={last5Backfill} />
+            <ChainageProgressChart data={chainageProgressData} />
           </>
         )}
       </main>

@@ -1,18 +1,44 @@
-import { createClient } from "@/lib/supabase/server";
-import { getLastNWorkingDays } from "@/lib/utils/workingDays";
+/**
+ * Dashboard operational queries use the admin client to avoid JWT/session
+ * refresh failures during server-side rendering (PGRST303, JWT expired).
+ */
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getLastNWorkingDays, getWorkingDaysInRange } from "@/lib/utils/workingDays";
 import { PIPE_LENGTH_M } from "@/lib/constants";
 
 export type HourlyPipeProgress = { hour: string; pipes: number };
 export type HourlyBackfillProgress = { hour: string; metres: number };
 export type WaterByActivity = { activity: string; litres: number };
 export type DayValue = { day: string; value: number };
+export type MonthlyDayValue = {
+  date: string;
+  label: string;
+  pipeMetres: number;
+  backfillMetres: number;
+  pipeMetresCumulative: number;
+  backfillMetresCumulative: number;
+};
+export type ChainageProgressValue = {
+  date: string;
+  label: string;
+  pipeChainage: number;
+  backfillChainage: number;
+};
 
 function getToday(): string {
   return new Date().toISOString().split("T")[0];
 }
 
+function getTodayPerth(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Australia/Perth" });
+}
+
+function toPerthDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-CA", { timeZone: "Australia/Perth" });
+}
+
 function getTargetDate(date?: string): string {
-  return date ?? getToday();
+  return date ?? getTodayPerth();
 }
 
 /** Day boundaries UTC */
@@ -33,6 +59,35 @@ function dayStartEndPerth(date?: string): { start: string; end: string } {
   };
 }
 
+const BACKFILL_M_PER_RECORD = 20;
+
+/**
+ * Calculate daily backfill metres from psp_records.
+ * Each valid record = 20 m. Valid = recorded_at, location_id, chainage numeric, day in validDays.
+ */
+function calculateDailyBackfillFromRecords(
+  rows: { recorded_at?: string; chainage?: unknown; location_id?: string }[],
+  validDays: string[]
+): Record<string, number> {
+  const byDay: Record<string, number> = {};
+  for (const r of rows) {
+    const rawTs = r.recorded_at;
+    if (!rawTs) continue;
+    const locId = r.location_id;
+    const chainage = Number(r.chainage);
+    if (!locId || isNaN(chainage)) continue;
+    const day = toPerthDate(String(rawTs));
+    if (!day || !validDays.includes(day)) continue;
+    byDay[day] = (byDay[day] ?? 0) + 1;
+  }
+  const result: Record<string, number> = {};
+  for (const day of validDays) {
+    const count = byDay[day] ?? 0;
+    result[day] = Math.round(count * BACKFILL_M_PER_RECORD * 10) / 10;
+  }
+  return result;
+}
+
 function dayToLabel(d: string): string {
   const dt = new Date(d + "T12:00:00");
   const names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -40,7 +95,7 @@ function dayToLabel(d: string): string {
 }
 
 export async function getCrewId(crewName: string): Promise<string | null> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   const { data } = await supabase
     .from("crews")
     .select("id")
@@ -50,12 +105,103 @@ export async function getCrewId(crewName: string): Promise<string | null> {
 }
 
 async function getSectionIdsForCrew(crewId: string): Promise<string[]> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   const { data } = await supabase
     .from("drainer_sections")
     .select("id")
     .eq("crew_id", crewId);
   return data?.map((s) => s.id) ?? [];
+}
+
+export type SectionInfo = {
+  id: string;
+  name: string;
+  startCh: number;
+  endCh: number;
+  direction: "onwards" | "backwards";
+};
+
+export type SectionProgressData = {
+  sectionId: string;
+  installedChainage: number;
+  finalChainage: number;
+  percent: number;
+  pipeCount: number;
+};
+
+export async function getSectionsForCrew(crewId: string | null): Promise<SectionInfo[]> {
+  if (!hasSupabaseEnv() || !crewId) return [];
+  try {
+    const supabase = createAdminClient();
+    const { data, error } = await supabase
+      .from("drainer_sections")
+      .select("id, name, start_ch, end_ch, direction")
+      .eq("crew_id", crewId);
+    if (error) throw error;
+    return (data ?? []).map((s) => ({
+      id: s.id,
+      name: s.name ?? "Section",
+      startCh: Number(s.start_ch) || 0,
+      endCh: Number(s.end_ch) || 0,
+      direction: (s.direction === "backwards" ? "backwards" : "onwards") as "onwards" | "backwards",
+    }));
+  } catch (err) {
+    console.error("[Dashboard] getSectionsForCrew failed:", err);
+    return [];
+  }
+}
+
+export async function getSectionChainageProgress(
+  sectionId: string
+): Promise<SectionProgressData | null> {
+  if (!hasSupabaseEnv()) return null;
+  try {
+    const supabase = createAdminClient();
+    const [{ data: section }, { data: pipes }] = await Promise.all([
+      supabase
+        .from("drainer_sections")
+        .select("start_ch, end_ch, direction")
+        .eq("id", sectionId)
+        .maybeSingle(),
+      supabase
+        .from("drainer_pipe_records")
+        .select("chainage")
+        .eq("section_id", sectionId)
+        .not("chainage", "is", null),
+    ]);
+    if (!section || !pipes?.length) return null;
+    const startCh = Number(section.start_ch) || 0;
+    const endCh = Number(section.end_ch) || 0;
+    const direction = section.direction === "backwards";
+    const chainages = pipes.map((p) => Number(p.chainage)).filter((n) => !isNaN(n));
+    const minCh = Math.min(...chainages);
+    const maxCh = Math.max(...chainages);
+    const totalLength = Math.abs(startCh - endCh);
+    if (totalLength <= 0) return null;
+    let installedChainage: number;
+    let finalChainage = endCh;
+    if (direction) {
+      installedChainage = minCh;
+      finalChainage = endCh;
+    } else {
+      installedChainage = maxCh;
+      finalChainage = endCh;
+    }
+    const metresCovered = direction
+      ? startCh - minCh
+      : maxCh - startCh;
+    const percent = Math.min(100, Math.round((metresCovered / totalLength) * 100));
+    return {
+      sectionId,
+      installedChainage: Math.round(installedChainage * 10) / 10,
+      finalChainage,
+      percent,
+      pipeCount: pipes.length,
+    };
+  } catch (err) {
+    console.error("[Dashboard] getSectionChainageProgress failed:", err);
+    return null;
+  }
 }
 
 function dailyToHourlyPipes(total: number): HourlyPipeProgress[] {
@@ -109,7 +255,7 @@ export async function fetchPipesToday(
     return { data: { count: 22, meters: 22 * PIPE_LENGTH_M }, isMock: true };
   }
   try {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const targetDate = getTargetDate(date);
     let sectionIds: string[] = [];
     if (crewId) sectionIds = await getSectionIdsForCrew(crewId);
@@ -130,7 +276,7 @@ export async function fetchPipesToday(
   }
 }
 
-// --- 2. BACKFILL TODAY (psp_records, recorded_at, chainage diff per location/day) ---
+// --- 2. BACKFILL TODAY (psp_records, recorded_at → distinct chainage count × 20 m) ---
 export async function fetchBackfillToday(
   crewId?: string | null,
   date?: string
@@ -139,8 +285,9 @@ export async function fetchBackfillToday(
     return { data: { meters: 80 }, isMock: true };
   }
   try {
-    const supabase = await createClient();
-    const { start, end } = dayStartEndUtc(date);
+    const supabase = createAdminClient();
+    const targetDate = getTargetDate(date);
+    const { start, end } = dayStartEndPerth(targetDate);
 
     let pspQuery = supabase
       .from("psp_records")
@@ -162,24 +309,19 @@ export async function fetchBackfillToday(
     const { data: rows, error } = await pspQuery;
     if (error) throw error;
 
-    const byDayLoc: Record<string, Record<string, number[]>> = {};
-    for (const r of rows ?? []) {
-      const day = String((r as { recorded_at?: string }).recorded_at).split("T")[0];
-      const locId = (r as { location_id?: string }).location_id;
-      const chainage = Number((r as { chainage?: unknown }).chainage);
-      if (!day || !locId || isNaN(chainage)) continue;
-      if (!byDayLoc[day]) byDayLoc[day] = {};
-      if (!byDayLoc[day][locId]) byDayLoc[day][locId] = [];
-      byDayLoc[day][locId].push(chainage);
-    }
-
-    let totalM = 0;
-    for (const locs of Object.values(byDayLoc)) {
-      for (const chainages of Object.values(locs)) {
-        if (chainages.length > 0) totalM += Math.max(...chainages) - Math.min(...chainages);
-      }
-    }
-    return { data: { meters: Math.round(totalM * 10) / 10 }, isMock: false };
+    const byDay = calculateDailyBackfillFromRecords(rows ?? [], [targetDate]);
+    const meters = byDay[targetDate] ?? 0;
+    console.log("[DEBUG] fetchBackfillToday", {
+      targetDate,
+      start,
+      end,
+      crewId: crewId ?? "all",
+      rowCount: rows?.length ?? 0,
+      sample: rows?.slice(0, 2),
+      byDay,
+      meters,
+    });
+    return { data: { meters }, isMock: false };
   } catch (error) {
     console.error("[Dashboard] fetchBackfillToday failed:", error);
     return { data: { meters: 80 }, isMock: true };
@@ -195,7 +337,7 @@ export async function fetchWaterToday(
     return { data: { totalKL: 28 }, isMock: true };
   }
   try {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const { start, end } = dayStartEndPerth(date);
 
     let query = supabase
@@ -212,7 +354,18 @@ export async function fetchWaterToday(
       (sum, r) => sum + (Number((r as { volume_liters?: number }).volume_liters) || 0),
       0
     );
-    return { data: { totalKL: Math.round((totalL / 1000) * 10) / 10 }, isMock: false };
+    const totalKL = Math.round((totalL / 1000) * 10) / 10;
+    console.log("[DEBUG] fetchWaterToday", {
+      date: getTargetDate(date),
+      start,
+      end,
+      crewId: crewId ?? "all",
+      rowCount: rows?.length ?? 0,
+      sample: rows?.slice(0, 2),
+      totalL,
+      totalKL,
+    });
+    return { data: { totalKL }, isMock: false };
   } catch (error) {
     console.error("[Dashboard] fetchWaterToday failed:", error);
     return { data: { totalKL: 28 }, isMock: true };
@@ -228,7 +381,7 @@ export async function fetchWaterByTask(
     return { data: MOCK_WATER_BY_TASK, isMock: true };
   }
   try {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const { start, end } = dayStartEndPerth(date);
 
     let query = supabase
@@ -241,6 +394,15 @@ export async function fetchWaterByTask(
     const { data: rows, error } = await query;
     if (error) throw error;
 
+    console.log("[DEBUG] fetchWaterByTask", {
+      date: getTargetDate(date),
+      start,
+      end,
+      crewId: crewId ?? "all",
+      rowCount: rows?.length ?? 0,
+      sample: rows?.slice(0, 3),
+    });
+
     const byTask: Record<string, number> = {};
     for (const r of rows ?? []) {
       const litres = Number((r as { volume_liters?: number }).volume_liters) || 0;
@@ -250,7 +412,7 @@ export async function fetchWaterByTask(
     }
 
     const result = Object.entries(byTask).map(([activity, litres]) => ({ activity, litres }));
-    return { data: result.length ? result : MOCK_WATER_BY_TASK, isMock: false };
+    return { data: result, isMock: false };
   } catch (error) {
     console.error("[Dashboard] fetchWaterByTask failed:", error);
     return { data: MOCK_WATER_BY_TASK, isMock: true };
@@ -263,7 +425,7 @@ export async function getLast5DaysPipes(
 ): Promise<DayValue[]> {
   if (!hasSupabaseEnv()) return MOCK_DAY_VALUES;
   try {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const days = getLastNWorkingDays(5);
     const start = days[0];
     const end = days[days.length - 1];
@@ -299,12 +461,10 @@ export async function getLast5DaysBackfill(
 ): Promise<DayValue[]> {
   if (!hasSupabaseEnv()) return MOCK_DAY_VALUES.map((d) => ({ ...d, value: 80 }));
   try {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const days = getLastNWorkingDays(5);
-    const start = days[0];
-    const end = days[days.length - 1];
-    const startTs = `${start}T00:00:00.000Z`;
-    const endTs = `${end}T23:59:59.999Z`;
+    const { start: startTs } = dayStartEndPerth(days[0]);
+    const { end: endTs } = dayStartEndPerth(days[days.length - 1]);
 
     let pspQuery = supabase
       .from("psp_records")
@@ -326,25 +486,7 @@ export async function getLast5DaysBackfill(
     const { data: rows, error } = await pspQuery;
     if (error) throw error;
 
-    const byDayLoc: Record<string, Record<string, number[]>> = {};
-    for (const r of rows ?? []) {
-      const day = String((r as { recorded_at?: string }).recorded_at).split("T")[0];
-      const locId = (r as { location_id?: string }).location_id;
-      const chainage = Number((r as { chainage?: unknown }).chainage);
-      if (!day || !locId || isNaN(chainage) || !days.includes(day)) continue;
-      if (!byDayLoc[day]) byDayLoc[day] = {};
-      if (!byDayLoc[day][locId]) byDayLoc[day][locId] = [];
-      byDayLoc[day][locId].push(chainage);
-    }
-
-    const byDay: Record<string, number> = {};
-    for (const [day, locs] of Object.entries(byDayLoc)) {
-      let total = 0;
-      for (const chainages of Object.values(locs)) {
-        if (chainages.length > 0) total += Math.max(...chainages) - Math.min(...chainages);
-      }
-      byDay[day] = Math.round(total * 10) / 10;
-    }
+    const byDay = calculateDailyBackfillFromRecords(rows ?? [], days);
     return days.map((d) => ({ day: dayToLabel(d), value: byDay[d] ?? 0 }));
   } catch (error) {
     console.error("[Dashboard] getLast5DaysBackfill failed:", error);
@@ -377,4 +519,193 @@ export async function getTodayWaterByActivity(
 ): Promise<WaterByActivity[]> {
   const res = await fetchWaterByTask(crewId, date);
   return res.data;
+}
+
+// --- CURRENT MONTH DAILY PROGRESS ---
+export async function getCurrentMonthDailyProgress(
+  crewId?: string | null
+): Promise<MonthlyDayValue[]> {
+  const today = getTodayPerth();
+  const now = new Date();
+  const firstStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  const workingDays = getWorkingDaysInRange(firstStr, today);
+
+  if (!hasSupabaseEnv()) {
+    return workingDays.map((d, i) => ({
+      date: d,
+      label: dayToLabel(d),
+      pipeMetres: 20 * PIPE_LENGTH_M,
+      backfillMetres: 70,
+      pipeMetresCumulative: (i + 1) * 20 * PIPE_LENGTH_M,
+      backfillMetresCumulative: (i + 1) * 70,
+    }));
+  }
+
+  try {
+    const supabase = createAdminClient();
+    let sectionIds: string[] = [];
+    if (crewId) sectionIds = await getSectionIdsForCrew(crewId);
+
+    const { start: startTs } = dayStartEndPerth(workingDays[0]);
+    const { end: endTs } = dayStartEndPerth(workingDays[workingDays.length - 1]);
+
+    let pipeQuery = supabase
+      .from("drainer_pipe_records")
+      .select("date_installed")
+      .gte("date_installed", workingDays[0])
+      .lte("date_installed", workingDays[workingDays.length - 1]);
+    if (sectionIds.length > 0) pipeQuery = pipeQuery.in("section_id", sectionIds);
+
+    const { data: pipeRows, error: pipeErr } = await pipeQuery;
+    if (pipeErr) throw pipeErr;
+
+    const pipeByDay: Record<string, number> = {};
+    for (const r of pipeRows ?? []) {
+      const d = (r as { date_installed?: string }).date_installed;
+      if (d && workingDays.includes(d)) {
+        pipeByDay[d] = (pipeByDay[d] ?? 0) + 1;
+      }
+    }
+
+    let pspQuery = supabase
+      .from("psp_records")
+      .select("recorded_at, chainage, location_id")
+      .gte("recorded_at", startTs)
+      .lte("recorded_at", endTs)
+      .not("chainage", "is", null);
+    if (crewId) {
+      const { data: locs } = await supabase
+        .from("locations")
+        .select("id")
+        .eq("location_type", "psp")
+        .eq("crew_id", crewId);
+      const locIds = locs?.map((l) => l.id) ?? [];
+      if (locIds.length > 0) pspQuery = pspQuery.in("location_id", locIds);
+    }
+
+    const { data: pspRows, error: pspErr } = await pspQuery;
+    if (pspErr) throw pspErr;
+
+    const backfillByDay = calculateDailyBackfillFromRecords(pspRows ?? [], workingDays);
+
+    let pipeCum = 0;
+    let backfillCum = 0;
+    const result = workingDays.map((d) => {
+      const pipeM = Math.round(((pipeByDay[d] ?? 0) * PIPE_LENGTH_M) * 10) / 10;
+      const backfillM = backfillByDay[d] ?? 0;
+      pipeCum += pipeM;
+      backfillCum += backfillM;
+      return {
+        date: d,
+        label: dayToLabel(d),
+        pipeMetres: pipeM,
+        backfillMetres: backfillM,
+        pipeMetresCumulative: Math.round(pipeCum * 10) / 10,
+        backfillMetresCumulative: Math.round(backfillCum * 10) / 10,
+      };
+    });
+    return result;
+  } catch (error) {
+    console.error("[Dashboard] getCurrentMonthDailyProgress failed:", error);
+    return workingDays.map((d, i) => ({
+      date: d,
+      label: dayToLabel(d),
+      pipeMetres: 20 * PIPE_LENGTH_M,
+      backfillMetres: 70,
+      pipeMetresCumulative: (i + 1) * 20 * PIPE_LENGTH_M,
+      backfillMetresCumulative: (i + 1) * 70,
+    }));
+  }
+}
+
+// --- CHAINAGE PROGRESS (pipe vs backfill by chainage) ---
+export async function getChainageProgressData(
+  crewId?: string | null
+): Promise<ChainageProgressValue[]> {
+  const monthlyProgress = await getCurrentMonthDailyProgress(crewId);
+  if (!monthlyProgress.length) return [];
+
+  if (!hasSupabaseEnv()) {
+    const initial = 2000;
+    return monthlyProgress.map((r, i) => ({
+      date: r.date,
+      label: r.label,
+      pipeChainage: Math.round((initial - r.pipeMetresCumulative) * 10) / 10,
+      backfillChainage: Math.round((initial - (i + 1) * 100) * 10) / 10,
+    }));
+  }
+
+  try {
+    const supabase = createAdminClient();
+    const workingDays = monthlyProgress.map((r) => r.date);
+    const { start: startTs } = dayStartEndPerth(workingDays[0]);
+    const { end: endTs } = dayStartEndPerth(workingDays[workingDays.length - 1]);
+
+    let pspQuery = supabase
+      .from("psp_records")
+      .select("recorded_at, chainage")
+      .gte("recorded_at", startTs)
+      .lte("recorded_at", endTs)
+      .not("chainage", "is", null);
+
+    if (crewId) {
+      const { data: locs } = await supabase
+        .from("locations")
+        .select("id")
+        .eq("location_type", "psp")
+        .eq("crew_id", crewId);
+      const locIds = locs?.map((l) => l.id) ?? [];
+      if (locIds.length > 0) pspQuery = pspQuery.in("location_id", locIds);
+    }
+
+    const { data: pspRows, error } = await pspQuery;
+    if (error) throw error;
+
+    const byDay: Record<string, number[]> = {};
+    for (const r of pspRows ?? []) {
+      const rawTs = (r as { recorded_at?: string }).recorded_at;
+      if (!rawTs) continue;
+      const day = toPerthDate(String(rawTs));
+      const ch = Number((r as { chainage?: unknown }).chainage);
+      if (!day || isNaN(ch) || !workingDays.includes(day)) continue;
+      if (!byDay[day]) byDay[day] = [];
+      byDay[day].push(ch);
+    }
+
+    let initialChainage =
+      pspRows?.length && pspRows.some((r) => !isNaN(Number((r as { chainage?: unknown }).chainage)))
+        ? Math.max(
+            ...pspRows
+              .map((r) => Number((r as { chainage?: unknown }).chainage))
+              .filter((n) => !isNaN(n))
+          )
+        : 0;
+    if (initialChainage <= 0) {
+      const maxPipe = Math.max(...monthlyProgress.map((r) => r.pipeMetresCumulative));
+      initialChainage = maxPipe + 100;
+    }
+
+    let runningMin = initialChainage;
+    const backfillByDay: Record<string, number> = {};
+    for (const d of workingDays) {
+      const dayChainages = byDay[d] ?? [];
+      if (dayChainages.length > 0) runningMin = Math.min(runningMin, ...dayChainages);
+      backfillByDay[d] = Math.round(runningMin * 10) / 10;
+    }
+
+    return monthlyProgress.map((r) => ({
+      date: r.date,
+      label: r.label,
+      pipeChainage: Math.round((initialChainage - r.pipeMetresCumulative) * 10) / 10,
+      backfillChainage: backfillByDay[r.date] ?? initialChainage,
+    }));
+  } catch (err) {
+    console.error("[Dashboard] getChainageProgressData failed:", err);
+    return monthlyProgress.map((r) => ({
+      date: r.date,
+      label: r.label,
+      pipeChainage: 0,
+      backfillChainage: 0,
+    }));
+  }
 }

@@ -23,12 +23,20 @@ function ScheduleIndicator({ status, delta }: { status: ScheduleStatus; delta?: 
   );
 }
 
-export function ProjectProgress() {
-  const percent = 65;
-  const installed = 80;
-  const planned = 120;
-  const scheduleStatus: ScheduleStatus = "ahead";
-  const scheduleDelta = 4;
+type ProjectProgressProps = {
+  installed: number;
+  planned: number;
+  scheduleStatus: ScheduleStatus;
+  scheduleDelta: number;
+};
+
+export function ProjectProgress({
+  installed,
+  planned,
+  scheduleStatus,
+  scheduleDelta,
+}: ProjectProgressProps) {
+  const percent = planned > 0 ? Math.min(100, Math.round((installed / planned) * 100)) : 0;
   const pb = tokens.components.progressBar;
 
   return (

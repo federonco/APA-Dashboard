@@ -11,18 +11,19 @@ import {
 type SpreadsheetModeProps = {
   data: SpreadsheetData;
   crew: string;
+  referenceDate?: string;
 };
 
-export function SpreadsheetMode({ data, crew }: SpreadsheetModeProps) {
+export function SpreadsheetMode({ data, crew, referenceDate }: SpreadsheetModeProps) {
   const [period, setPeriod] = useState<PeriodFilter>("week");
   const dRef = useRef<HTMLDivElement>(null);
   const bRef = useRef<HTMLDivElement>(null);
   const wRef = useRef<HTMLDivElement>(null);
 
   const filtered = {
-    onsiteD: filterByPeriod(data.onsiteD, period),
-    onsiteB: filterByPeriod(data.onsiteB, period),
-    onsiteW: filterByPeriod(data.onsiteW, period),
+    onsiteD: filterByPeriod(data.onsiteD, period, referenceDate),
+    onsiteB: filterByPeriod(data.onsiteB, period, referenceDate),
+    onsiteW: filterByPeriod(data.onsiteW, period, referenceDate),
   };
 
   const crewLabel = crew === "Global" ? "All Crews" : `Crew ${crew}`;
@@ -86,6 +87,11 @@ export function SpreadsheetMode({ data, crew }: SpreadsheetModeProps) {
         <div className="flex items-center justify-between">
           <h2 className={sectionTitleStyles}>
             OnSite-D (Pipes)
+            {data.mockFlags?.d && (
+              <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800">
+                mock data
+              </span>
+            )}
           </h2>
           <button
             type="button"
@@ -133,6 +139,11 @@ export function SpreadsheetMode({ data, crew }: SpreadsheetModeProps) {
         <div className="flex items-center justify-between">
           <h2 className={sectionTitleStyles}>
             OnSite-B (Backfill)
+            {data.mockFlags?.b && (
+              <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800">
+                mock data
+              </span>
+            )}
           </h2>
           <button
             type="button"
@@ -149,7 +160,7 @@ export function SpreadsheetMode({ data, crew }: SpreadsheetModeProps) {
                 <th className={thStyles}>Date</th>
                 <th className={thStyles}>Time lodged</th>
                 <th className={thStyles}>Section</th>
-                <th className={`${thStyles} text-right`}>Backfill (m³)</th>
+                <th className={`${thStyles} text-right`}>Backfill (m)</th>
                 <th className={thStyles}>Crew</th>
               </tr>
             </thead>
@@ -180,6 +191,11 @@ export function SpreadsheetMode({ data, crew }: SpreadsheetModeProps) {
         <div className="flex items-center justify-between">
           <h2 className={sectionTitleStyles}>
             OnSite-W (Water)
+            {data.mockFlags?.w && (
+              <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800">
+                mock data
+              </span>
+            )}
           </h2>
           <button
             type="button"

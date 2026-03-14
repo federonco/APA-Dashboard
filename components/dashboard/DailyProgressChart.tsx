@@ -77,10 +77,29 @@ export function DailyProgressChart({
   backfillTarget = BACKFILL_TARGET,
 }: Props) {
   const [activeLine, setActiveLine] = useState<ActiveLine>(null);
+  const [visible, setVisible] = useState({
+    pipes: true,
+    pipeTarget: true,
+    backfill: true,
+    backfillTarget: true,
+  });
+  const toggle = (k: keyof typeof visible) => () =>
+    setVisible((v) => ({ ...v, [k]: !v[k] }));
+
   const chartData = buildChartData(pipeData, backfillData, pipeTarget, backfillTarget);
   const last = chartData[chartData.length - 1];
   const pipesActual = last?.pipes ?? 0;
   const metresActual = last?.backfill ?? 0;
+
+  const legendItems = useMemo(
+    () => [
+      { label: "Pipe Laid", color: tokens.charts.pipeLaid, active: visible.pipes, onClick: toggle("pipes") },
+      { label: "Pipe Target", color: tokens.charts.pipeTarget, dashed: true, active: visible.pipeTarget, onClick: toggle("pipeTarget") },
+      { label: "Backfill", color: tokens.charts.backfill, active: visible.backfill, onClick: toggle("backfill") },
+      { label: "Backfill Target", color: tokens.charts.backfillTarget, dashed: true, active: visible.backfillTarget, onClick: toggle("backfillTarget") },
+    ],
+    [visible]
+  );
 
   const actualDotProps = { r: 3 };
   const targetDotProps = { r: 2 };
@@ -182,6 +201,7 @@ export function DailyProgressChart({
                 tickLine={false}
                 width={28}
               />
+              {visible.pipes && (
               <Line
                 yAxisId="left"
                 type="monotone"
@@ -193,6 +213,8 @@ export function DailyProgressChart({
                 activeDot={activeDotPipes}
                 name="Pipe Laid"
               />
+              )}
+              {visible.pipeTarget && (
               <Line
                 yAxisId="left"
                 type="monotone"
@@ -209,6 +231,8 @@ export function DailyProgressChart({
                 activeDot={activeDotPipeTarget}
                 name="Pipe Target"
               />
+              )}
+              {visible.backfill && (
               <Line
                 yAxisId="right"
                 type="monotone"
@@ -220,6 +244,8 @@ export function DailyProgressChart({
                 activeDot={activeDotBackfill}
                 name="Backfill"
               />
+              )}
+              {visible.backfillTarget && (
               <Line
                 yAxisId="right"
                 type="monotone"
@@ -236,18 +262,12 @@ export function DailyProgressChart({
                 activeDot={activeDotBackfillTarget}
                 name="Backfill Target"
               />
+              )}
             </LineChart>
           </ResponsiveContainer>
         </div>
         <div style={{ marginTop: 12 }}>
-          <ChartLegend
-            items={[
-              { label: "Pipe Laid", color: tokens.charts.pipeLaid },
-              { label: "Pipe Target", color: tokens.charts.pipeTarget, dashed: true },
-              { label: "Backfill", color: tokens.charts.backfill },
-              { label: "Backfill Target", color: tokens.charts.backfillTarget, dashed: true },
-            ]}
-          />
+          <ChartLegend items={legendItems} />
         </div>
       </CardContent>
     </Card>

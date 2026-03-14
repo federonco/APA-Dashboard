@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useMemo, useEffect } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { tokens } from "@/lib/designTokens";
@@ -11,6 +12,7 @@ const ACTIVITY_COLOR_MAP: Record<string, string> = {
   "Dust suppression": tokens.waterChart.dustSuppression,
   Testing: tokens.waterChart.testing,
   Other: tokens.waterChart.other,
+  Vehicle: "#6B7280",
 };
 
 const FALLBACK_COLORS = [
@@ -26,17 +28,45 @@ function getColor(activity: string, index: number): string {
 
 type Props = {
   data: WaterByActivity[];
+  vehicleLitres?: number;
 };
 
-export function WaterConsumptionChart({ data }: Props) {
-  const totalLitres = data.reduce((sum, d) => sum + d.litres, 0);
+export function WaterConsumptionChart({ data, vehicleLitres = 0 }: Props) {
+  const baseItems = useMemo(() => {
+    const items = data.map((d, i) => ({
+      name: d.activity,
+      value: d.litres,
+      color: getColor(d.activity, i),
+    }));
+    if (vehicleLitres > 0) {
+      items.push({ name: "Vehicle", value: vehicleLitres, color: ACTIVITY_COLOR_MAP.Vehicle });
+    }
+    return items;
+  }, [data, vehicleLitres]);
+
+  const [visible, setVisible] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(baseItems.map((i) => [i.name, true]))
+  );
+
+  useEffect(() => {
+    setVisible((prev) => {
+      const next: Record<string, boolean> = {};
+      for (const i of baseItems) {
+        next[i.name] = i.name in prev ? prev[i.name] : true;
+      }
+      return Object.keys(next).length ? next : prev;
+    });
+  }, [baseItems]);
+
+  const chartData = useMemo(
+    () => baseItems.filter((i) => visible[i.name] ?? true),
+    [baseItems, visible]
+  );
+  const totalLitres = chartData.reduce((sum, d) => sum + d.value, 0);
   const totalKL = (totalLitres / 1000).toFixed(1);
 
-  const chartData = data.map((d, i) => ({
-    name: d.activity,
-    value: d.litres,
-    color: getColor(d.activity, i),
-  }));
+  const toggle = (name: string) => () =>
+    setVisible((v) => ({ ...v, [name]: !(v[name] ?? true) }));
 
   return (
     <Card
@@ -98,7 +128,7 @@ export function WaterConsumptionChart({ data }: Props) {
                   cy="50%"
                   innerRadius={48}
                   outerRadius={77}
-                  paddingAngle={2}
+                  paddingAngle={chartData.length > 1 ? 2 : 0}
                   dataKey="value"
                 >
                   {chartData.map((entry) => (
@@ -116,12 +146,25 @@ export function WaterConsumptionChart({ data }: Props) {
             }}
           >
             <tbody>
-              {chartData.map((entry) => {
-                const pct =
-                  totalLitres > 0 ? ((entry.value / totalLitres) * 100).toFixed(1) : "0";
+              {baseItems.map((entry) => {
+                const isActive = visible[entry.name] ?? true;
+                const allLitres = baseItems.reduce((s, i) => s + i.value, 0);
+                const pct = allLitres > 0 ? ((entry.value / allLitres) * 100).toFixed(1) : "0";
                 const kL = (entry.value / 1000).toFixed(1);
                 return (
-                  <tr key={entry.name}>
+                  <tr
+                    key={entry.name}
+                    role="button"
+                    tabIndex={0}
+                    onClick={toggle(entry.name)}
+                    onKeyDown={(e) =>
+                      (e.key === "Enter" || e.key === " ") && (e.preventDefault(), toggle(entry.name)())
+                    }
+                    style={{
+                      cursor: "pointer",
+                      opacity: isActive ? 1 : 0.5,
+                    }}
+                  >
                     <td style={{ padding: "2px 8px 2px 0", verticalAlign: "middle", width: 1 }}>
                       <span
                         style={{
@@ -130,6 +173,7 @@ export function WaterConsumptionChart({ data }: Props) {
                           height: 8,
                           borderRadius: "50%",
                           background: entry.color,
+                          opacity: isActive ? 1 : 0.5,
                         }}
                       />
                     </td>
@@ -138,6 +182,7 @@ export function WaterConsumptionChart({ data }: Props) {
                         padding: "2px 16px 2px 0",
                         textAlign: "left",
                         color: tokens.text.secondary,
+                        textDecoration: isActive ? "none" : "line-through",
                       }}
                     >
                       {entry.name}

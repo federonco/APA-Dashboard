@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { tokens } from "@/lib/designTokens";
@@ -74,6 +75,21 @@ export function Header({ crew }: Props) {
           >
             {today}
           </span>
+          <Link
+            href="/admin"
+            style={{
+              padding: "8px 16px",
+              fontSize: tokens.typography.body,
+              fontWeight: 600,
+              color: tokens.text.primary,
+              background: tokens.theme.card,
+              border: `1px solid ${tokens.theme.border}`,
+              borderRadius: tokens.radius.card,
+              textDecoration: "none",
+            }}
+          >
+            Admin
+          </Link>
           <a
             href={toggleUrl}
             style={{

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import {
   LineChart,
   Line,
@@ -20,10 +21,25 @@ const BACKFILL_COLOR = "#38bdf8";
 
 type Props = {
   data: MonthlyDayValue[];
+  historicData?: MonthlyDayValue[];
 };
 
-export function MonthlyProgressChart({ data }: Props) {
-  if (!data || data.length === 0) {
+export function MonthlyProgressChart({ data, historicData = [] }: Props) {
+  const [viewMode, setViewMode] = useState<"current" | "historic">("current");
+  const [visible, setVisible] = useState({ pipe: true, backfill: true });
+
+  const chartData = viewMode === "historic" && historicData.length > 0 ? historicData : data;
+  const toggle = (key: keyof typeof visible) => () =>
+    setVisible((v) => ({ ...v, [key]: !v[key] }));
+
+  const legendItems = useMemo(
+    () => [
+      { label: "PIPE LAID", color: PIPE_COLOR, active: visible.pipe, onClick: toggle("pipe") },
+      { label: "BACKFILL", color: BACKFILL_COLOR, active: visible.backfill, onClick: toggle("backfill") },
+    ],
+    [visible]
+  );
+  if (!chartData || chartData.length === 0) {
     return (
       <Card
         style={{
@@ -42,7 +58,7 @@ export function MonthlyProgressChart({ data }: Props) {
               letterSpacing: "0.02em",
             }}
           >
-            DAILY PROGRESS — CURRENT MONTH
+            DAILY PROGRESS — {viewMode === "historic" ? "HISTORIC (6M)" : "CURRENT MONTH"}
           </span>
         </CardHeader>
         <CardContent style={{ padding: 0 }}>
@@ -63,11 +79,9 @@ export function MonthlyProgressChart({ data }: Props) {
     );
   }
 
-  const last = data[data.length - 1];
+  const last = chartData[chartData.length - 1];
   const pipeM = last?.pipeMetresCumulative ?? 0;
   const backfillM = last?.backfillMetresCumulative ?? 0;
-
-  const chartData = [...data];
 
   return (
     <Card
@@ -86,18 +100,33 @@ export function MonthlyProgressChart({ data }: Props) {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "flex-start",
+          flexWrap: "wrap",
+          gap: 8,
         }}
       >
-        <span
-          style={{
-            fontSize: "0.875rem",
-            fontWeight: 500,
-            color: "#71717a",
-            letterSpacing: "0.02em",
-          }}
-        >
-          DAILY PROGRESS — CURRENT MONTH
-        </span>
+        <div className="flex items-center gap-2">
+          <span
+            style={{
+              fontSize: "0.875rem",
+              fontWeight: 500,
+              color: "#71717a",
+              letterSpacing: "0.02em",
+            }}
+          >
+            DAILY PROGRESS — {viewMode === "historic" ? "HISTORIC (6M)" : "CURRENT MONTH"}
+          </span>
+          {historicData.length > 0 && (
+            <select
+              value={viewMode}
+              onChange={(e) => setViewMode(e.target.value as "current" | "historic")}
+              className="rounded border px-2 py-1 text-xs"
+              style={{ borderColor: "#E8E6EB", color: "#3f3f46" }}
+            >
+              <option value="current">Current month</option>
+              <option value="historic">Historic (6 months)</option>
+            </select>
+          )}
+        </div>
         <span
           style={{
             borderRadius: tokens.radius.badge,
@@ -137,32 +166,31 @@ export function MonthlyProgressChart({ data }: Props) {
                 unit=" m"
               />
               <Tooltip content={<CustomTooltip />} />
-              <Line
-                type="monotone"
-                dataKey="pipeMetresCumulative"
-                stroke={PIPE_COLOR}
-                strokeWidth={2}
-                dot={{ fill: PIPE_COLOR, r: 3 }}
-                name="PIPE LAID"
-              />
-              <Line
-                type="monotone"
-                dataKey="backfillMetresCumulative"
-                stroke={BACKFILL_COLOR}
-                strokeWidth={2}
-                dot={{ fill: BACKFILL_COLOR, r: 3 }}
-                name="BACKFILL"
-              />
+              {visible.pipe && (
+                <Line
+                  type="monotone"
+                  dataKey="pipeMetresCumulative"
+                  stroke={PIPE_COLOR}
+                  strokeWidth={2}
+                  dot={{ fill: PIPE_COLOR, r: 3 }}
+                  name="PIPE LAID"
+                />
+              )}
+              {visible.backfill && (
+                <Line
+                  type="monotone"
+                  dataKey="backfillMetresCumulative"
+                  stroke={BACKFILL_COLOR}
+                  strokeWidth={2}
+                  dot={{ fill: BACKFILL_COLOR, r: 3 }}
+                  name="BACKFILL"
+                />
+              )}
             </LineChart>
           </ResponsiveContainer>
         </div>
         <div style={{ marginTop: 12 }}>
-          <ChartLegend
-            items={[
-              { label: "PIPE LAID", color: PIPE_COLOR },
-              { label: "BACKFILL", color: BACKFILL_COLOR },
-            ]}
-          />
+          <ChartLegend items={legendItems} />
         </div>
       </CardContent>
     </Card>

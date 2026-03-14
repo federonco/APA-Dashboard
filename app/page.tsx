@@ -5,7 +5,9 @@ import {
   fetchBackfillToday,
   fetchWaterToday,
   getCurrentMonthDailyProgress,
+  getHistoricMonthlyProgress,
   getChainageProgressData,
+  getHistoricChainageProgressData,
   getSectionsForCrew,
   getSectionChainageProgress,
 } from "@/lib/queries/daily";
@@ -50,19 +52,25 @@ export default async function Page({ searchParams }: Props) {
     waterTodayRes,
     waterByActivity,
     currentMonthProgress,
+    historicProgress,
     chainageProgressData,
+    historicChainageProgressData,
   ] = await Promise.all([
     fetchPipesToday(crewId ?? undefined, selectedDate),
     fetchBackfillToday(crewId ?? undefined, selectedDate),
     fetchWaterToday(crewId ?? undefined, selectedDate),
     getTodayWaterByActivity(crewId ?? undefined, selectedDate),
     getCurrentMonthDailyProgress(crewId ?? undefined),
+    getHistoricMonthlyProgress(crewId ?? undefined),
     getChainageProgressData(crewId ?? undefined),
+    getHistoricChainageProgressData(crewId ?? undefined),
   ]);
 
   const isCrewEnabled = CREW_TABS.find((t) => t.name === crew)?.enabled ?? false;
   const spreadsheetData =
-    isCrewEnabled && view === "spreadsheet" ? await getSpreadsheetData(crew) : null;
+    isCrewEnabled && view === "spreadsheet"
+      ? await getSpreadsheetData(crew, selectedDate)
+      : null;
 
   const sections = crewId ? await getSectionsForCrew(crewId) : [];
   const progressBySection: Record<string, Awaited<ReturnType<typeof getSectionChainageProgress>>> = {};
@@ -98,7 +106,10 @@ export default async function Page({ searchParams }: Props) {
             </span>
           </div>
         ) : view === "spreadsheet" && spreadsheetData ? (
-          <SpreadsheetMode data={spreadsheetData} crew={crew} />
+          <>
+            <DaySelector currentDate={rawDate} />
+            <SpreadsheetMode data={spreadsheetData} crew={crew} referenceDate={selectedDate} />
+          </>
         ) : (
           <>
             <DaySelector currentDate={rawDate} />
@@ -113,13 +124,16 @@ export default async function Page({ searchParams }: Props) {
               style={{ gap: tokens.spacing.gap }}
             >
               <div className="col-span-2 h-full">
-                <MonthlyProgressChart data={currentMonthProgress} />
+                <MonthlyProgressChart
+                  data={currentMonthProgress}
+                  historicData={historicProgress}
+                />
               </div>
               <div className="col-span-1 h-full">
                 <WaterConsumptionChart data={waterByActivity} />
               </div>
             </div>
-            <ChainageProgressChart data={chainageProgressData} />
+            <ChainageProgressChart data={chainageProgressData} historicData={historicChainageProgressData} />
           </>
         )}
       </main>

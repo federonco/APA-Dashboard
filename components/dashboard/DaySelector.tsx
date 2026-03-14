@@ -67,7 +67,10 @@ export function DaySelector({ currentDate }: Props) {
 
   function handleSelect(date: Date | undefined) {
     if (!date) return;
-    const yyyyMmDd = date.toISOString().split("T")[0];
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    const yyyyMmDd = `${y}-${m}-${d}`;
     const working = toWorkingDay(yyyyMmDd);
     setOpen(false);
     router.push(`${base}&date=${working}`);
@@ -87,12 +90,13 @@ export function DaySelector({ currentDate }: Props) {
       </Link>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger
-          className="rounded-md px-3 py-1.5 text-sm font-semibold hover:bg-black/5 cursor-pointer transition-colors"
+          render={<button type="button" />}
+          className="rounded-md px-3 py-1.5 text-sm font-semibold hover:bg-black/5 cursor-pointer transition-colors border-0 bg-transparent"
           style={{ color: tokens.text.primary }}
         >
           {displayDate}
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
+        <PopoverContent className="w-auto p-0 z-[9999]" align="start">
           <Calendar
             mode="single"
             selected={selectedDate}

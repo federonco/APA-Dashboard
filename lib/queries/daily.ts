@@ -104,7 +104,7 @@ export async function getCrewId(crewName: string): Promise<string | null> {
   return data?.id ?? null;
 }
 
-async function getSectionIdsForCrew(crewId: string): Promise<string[]> {
+export async function getSectionIdsForCrew(crewId: string): Promise<string[]> {
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("drainer_sections")
@@ -311,16 +311,6 @@ export async function fetchBackfillToday(
 
     const byDay = calculateDailyBackfillFromRecords(rows ?? [], [targetDate]);
     const meters = byDay[targetDate] ?? 0;
-    console.log("[DEBUG] fetchBackfillToday", {
-      targetDate,
-      start,
-      end,
-      crewId: crewId ?? "all",
-      rowCount: rows?.length ?? 0,
-      sample: rows?.slice(0, 2),
-      byDay,
-      meters,
-    });
     return { data: { meters }, isMock: false };
   } catch (error) {
     console.error("[Dashboard] fetchBackfillToday failed:", error);
@@ -355,16 +345,6 @@ export async function fetchWaterToday(
       0
     );
     const totalKL = Math.round((totalL / 1000) * 10) / 10;
-    console.log("[DEBUG] fetchWaterToday", {
-      date: getTargetDate(date),
-      start,
-      end,
-      crewId: crewId ?? "all",
-      rowCount: rows?.length ?? 0,
-      sample: rows?.slice(0, 2),
-      totalL,
-      totalKL,
-    });
     return { data: { totalKL }, isMock: false };
   } catch (error) {
     console.error("[Dashboard] fetchWaterToday failed:", error);
@@ -618,6 +598,108 @@ export async function getCurrentMonthDailyProgress(
   }
 }
 
+// --- HISTORIC MONTHLY PROGRESS (last 6 months by location/crew) ---
+export async function getHistoricMonthlyProgress(
+  crewId?: string | null
+): Promise<MonthlyDayValue[]> {
+  const today = getTodayPerth();
+  const months: { first: string; last: string; label: string }[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(today + "T12:00:00");
+    d.setMonth(d.getMonth() - i);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const first = `${y}-${m}-01`;
+    const lastDay = new Date(y, d.getMonth() + 1, 0);
+    const last = `${y}-${m}-${String(lastDay.getDate()).padStart(2, "0")}`;
+    months.push({ first, last, label: lastDay.toLocaleDateString("en-AU", { month: "short", year: "2-digit" }) });
+  }
+
+  if (!hasSupabaseEnv()) {
+    return months.map((mo, i) => ({
+      date: mo.first,
+      label: mo.label,
+      pipeMetres: 400,
+      backfillMetres: 1400,
+      pipeMetresCumulative: (i + 1) * 400,
+      backfillMetresCumulative: (i + 1) * 1400,
+    }));
+  }
+
+  try {
+    const supabase = createAdminClient();
+    let sectionIds: string[] = [];
+    if (crewId) sectionIds = await getSectionIdsForCrew(crewId);
+
+    const result: MonthlyDayValue[] = [];
+    let pipeCum = 0;
+    let backfillCum = 0;
+
+    for (const mo of months) {
+      const workingDays = getWorkingDaysInRange(mo.first, mo.last);
+      const { start: startTs } = dayStartEndPerth(workingDays[0] ?? mo.first);
+      const { end: endTs } = dayStartEndPerth(workingDays[workingDays.length - 1] ?? mo.last);
+
+      let pipeQuery = supabase
+        .from("drainer_pipe_records")
+        .select("date_installed")
+        .gte("date_installed", mo.first)
+        .lte("date_installed", mo.last);
+      if (sectionIds.length > 0) pipeQuery = pipeQuery.in("section_id", sectionIds);
+      const { data: pipeRows } = await pipeQuery;
+
+      let pspQuery = supabase
+        .from("psp_records")
+        .select("recorded_at, chainage, location_id")
+        .gte("recorded_at", startTs)
+        .lte("recorded_at", endTs)
+        .not("chainage", "is", null);
+      if (crewId) {
+        const { data: locs } = await supabase
+          .from("locations")
+          .select("id")
+          .eq("location_type", "psp")
+          .eq("crew_id", crewId);
+        const locIds = locs?.map((l) => l.id) ?? [];
+        if (locIds.length > 0) pspQuery = pspQuery.in("location_id", locIds);
+      }
+      const { data: pspRows } = await pspQuery;
+
+      const pipeByDay: Record<string, number> = {};
+      for (const r of pipeRows ?? []) {
+        const d = (r as { date_installed?: string }).date_installed;
+        if (d && workingDays.includes(d)) pipeByDay[d] = (pipeByDay[d] ?? 0) + 1;
+      }
+      const pipeM = Object.values(pipeByDay).reduce((s, c) => s + c * PIPE_LENGTH_M, 0);
+      const backfillByDay = calculateDailyBackfillFromRecords(pspRows ?? [], workingDays);
+      const backfillM = Object.values(backfillByDay).reduce((s, v) => s + v, 0);
+
+      pipeCum += Math.round(pipeM * 10) / 10;
+      backfillCum += Math.round(backfillM * 10) / 10;
+
+      result.push({
+        date: mo.first,
+        label: mo.label,
+        pipeMetres: Math.round(pipeM * 10) / 10,
+        backfillMetres: Math.round(backfillM * 10) / 10,
+        pipeMetresCumulative: Math.round(pipeCum * 10) / 10,
+        backfillMetresCumulative: Math.round(backfillCum * 10) / 10,
+      });
+    }
+    return result;
+  } catch (err) {
+    console.error("[Dashboard] getHistoricMonthlyProgress failed:", err);
+    return months.map((mo, i) => ({
+      date: mo.first,
+      label: mo.label,
+      pipeMetres: 400,
+      backfillMetres: 1400,
+      pipeMetresCumulative: (i + 1) * 400,
+      backfillMetresCumulative: (i + 1) * 1400,
+    }));
+  }
+}
+
 // --- CHAINAGE PROGRESS (pipe vs backfill by chainage) ---
 export async function getChainageProgressData(
   crewId?: string | null
@@ -706,6 +788,83 @@ export async function getChainageProgressData(
       label: r.label,
       pipeChainage: 0,
       backfillChainage: 0,
+    }));
+  }
+}
+
+export async function getHistoricChainageProgressData(
+  crewId?: string | null
+): Promise<ChainageProgressValue[]> {
+  const historicMonthly = await getHistoricMonthlyProgress(crewId);
+  if (!historicMonthly.length) return [];
+
+  if (!hasSupabaseEnv()) {
+    const initial = 2400;
+    return historicMonthly.map((r) => ({
+      date: r.date,
+      label: r.label,
+      pipeChainage: Math.round((initial - r.pipeMetresCumulative) * 10) / 10,
+      backfillChainage: Math.round((initial - r.backfillMetresCumulative * 0.5) * 10) / 10,
+    }));
+  }
+
+  try {
+    const supabase = createAdminClient();
+    const maxPipe = Math.max(...historicMonthly.map((r) => r.pipeMetresCumulative));
+    const initialChainage = maxPipe + 200;
+    const result: ChainageProgressValue[] = [];
+    let runningMinBackfill = initialChainage;
+
+    for (const mo of historicMonthly) {
+      const [y, m] = [mo.date.slice(0, 4), mo.date.slice(5, 7)];
+      const lastDay = new Date(+y, +m, 0);
+      const lastStr = `${y}-${m}-${String(lastDay.getDate()).padStart(2, "0")}`;
+      const workingDays = getWorkingDaysInRange(mo.date, lastStr);
+      if (!workingDays.length) {
+        result.push({ date: mo.date, label: mo.label, pipeChainage: initialChainage - mo.pipeMetresCumulative, backfillChainage: runningMinBackfill });
+        continue;
+      }
+      const { start: startTs } = dayStartEndPerth(workingDays[0]);
+      const { end: endTs } = dayStartEndPerth(workingDays[workingDays.length - 1]);
+
+      let pspQuery = supabase
+        .from("psp_records")
+        .select("recorded_at, chainage, location_id")
+        .gte("recorded_at", startTs)
+        .lte("recorded_at", endTs)
+        .not("chainage", "is", null);
+      if (crewId) {
+        const { data: locs } = await supabase
+          .from("locations")
+          .select("id")
+          .eq("location_type", "psp")
+          .eq("crew_id", crewId);
+        const locIds = locs?.map((l) => l.id) ?? [];
+        if (locIds.length > 0) pspQuery = pspQuery.in("location_id", locIds);
+      }
+      const { data: pspRows } = await pspQuery;
+
+      const chainages = (pspRows ?? [])
+        .map((r) => Number((r as { chainage?: unknown }).chainage))
+        .filter((n) => !isNaN(n) && n > 0);
+      if (chainages.length) runningMinBackfill = Math.min(runningMinBackfill, ...chainages);
+
+      result.push({
+        date: mo.date,
+        label: mo.label,
+        pipeChainage: Math.round((initialChainage - mo.pipeMetresCumulative) * 10) / 10,
+        backfillChainage: Math.round(runningMinBackfill * 10) / 10,
+      });
+    }
+    return result;
+  } catch (err) {
+    console.error("[Dashboard] getHistoricChainageProgressData failed:", err);
+    const initial = 2400;
+    return historicMonthly.map((r) => ({
+      date: r.date,
+      label: r.label,
+      pipeChainage: Math.round((initial - r.pipeMetresCumulative) * 10) / 10,
+      backfillChainage: Math.round((initial - r.backfillMetresCumulative * 0.5) * 10) / 10,
     }));
   }
 }

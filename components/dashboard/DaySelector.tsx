@@ -86,14 +86,11 @@ export function DaySelector({ currentDate }: Props) {
         ← Prev
       </Link>
       <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            className="rounded-md px-3 py-1.5 text-sm font-semibold hover:bg-black/5 cursor-pointer transition-colors"
-            style={{ color: tokens.text.primary }}
-          >
-            {displayDate}
-          </button>
+        <PopoverTrigger
+          className="rounded-md px-3 py-1.5 text-sm font-semibold hover:bg-black/5 cursor-pointer transition-colors"
+          style={{ color: tokens.text.primary }}
+        >
+          {displayDate}
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
           <Calendar

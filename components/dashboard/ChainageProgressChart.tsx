@@ -110,7 +110,7 @@ export function ChainageProgressChart({ data }: Props) {
                 fontFamily: "'DM Mono', monospace",
                 fontSize: "0.75rem",
               }}
-              formatter={(value: number) => [`${Number(value).toFixed(1)} Ch`]}
+              formatter={(value: unknown) => [`${Number(value ?? 0).toFixed(1)} Ch`]}
               labelFormatter={(_, payload) =>
                 (payload?.[0]?.payload as { date?: string })?.date ?? ""
               }

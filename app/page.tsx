@@ -58,8 +58,8 @@ export default async function Page({ searchParams }: Props) {
   ] = await Promise.all([
     fetchPipesToday(crewId ?? undefined, selectedDate),
     fetchBackfillToday(crewId ?? undefined, selectedDate),
-    fetchWaterToday(crewId ?? undefined, selectedDate),
-    getTodayWaterByActivity(crewId ?? undefined, selectedDate),
+    fetchWaterToday(crewForQueries, selectedDate),
+    getTodayWaterByActivity(crewForQueries, selectedDate),
     getCurrentMonthDailyProgress(crewId ?? undefined),
     getHistoricMonthlyProgress(crewId ?? undefined),
     getChainageProgressData(crewId ?? undefined),

@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useRef } from "react";
 import type { SpreadsheetData } from "@/lib/queries/spreadsheet";
 import {
   filterByPeriod,
   formatDate,
-  type PeriodFilter,
 } from "@/lib/utils/spreadsheetFormat";
 
 type SpreadsheetModeProps = {
@@ -15,10 +14,11 @@ type SpreadsheetModeProps = {
 };
 
 export function SpreadsheetMode({ data, crew, referenceDate }: SpreadsheetModeProps) {
-  const [period, setPeriod] = useState<PeriodFilter>("week");
   const dRef = useRef<HTMLDivElement>(null);
   const bRef = useRef<HTMLDivElement>(null);
   const wRef = useRef<HTMLDivElement>(null);
+
+  const period: "day" = "day";
 
   const filtered = {
     onsiteD: filterByPeriod(data.onsiteD, period, referenceDate),
@@ -71,18 +71,6 @@ export function SpreadsheetMode({ data, crew, referenceDate }: SpreadsheetModePr
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <select
-          value={period}
-          onChange={(e) => setPeriod(e.target.value as PeriodFilter)}
-          className="rounded-lg border border-[#EEECEF] bg-[#FCFBFB] px-3 py-2 text-[13px] text-zinc-800"
-        >
-          <option value="day">Day</option>
-          <option value="week">Week</option>
-          <option value="month">Month</option>
-        </select>
-      </div>
-
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className={sectionTitleStyles}>
@@ -109,7 +97,7 @@ export function SpreadsheetMode({ data, crew, referenceDate }: SpreadsheetModePr
                 <th className={thStyles}>Time lodged</th>
                 <th className={thStyles}>Section</th>
                 <th className={`${thStyles} text-right`}>Pipes Laid</th>
-                <th className={thStyles}>Crew</th>
+                <th className={thStyles}>Pipe ID</th>
               </tr>
             </thead>
             <tbody>
@@ -126,7 +114,7 @@ export function SpreadsheetMode({ data, crew, referenceDate }: SpreadsheetModePr
                     <td className={tdStyles}>{row.time_lodged ?? "—"}</td>
                     <td className={tdStyles}>{row.section}</td>
                     <td className={`${tdStyles} text-right tabular-nums`}>{row.pipes_laid}</td>
-                    <td className={tdStyles}>{row.crew}</td>
+                    <td className={tdStyles}>{row.pipe_id ?? "—"}</td>
                   </tr>
                 ))
               )}
@@ -161,7 +149,7 @@ export function SpreadsheetMode({ data, crew, referenceDate }: SpreadsheetModePr
                 <th className={thStyles}>Time lodged</th>
                 <th className={thStyles}>Section</th>
                 <th className={`${thStyles} text-right`}>Backfill (m)</th>
-                <th className={thStyles}>Crew</th>
+                <th className={`${thStyles} text-right`}>Chainage (Ch)</th>
               </tr>
             </thead>
             <tbody>
@@ -178,7 +166,7 @@ export function SpreadsheetMode({ data, crew, referenceDate }: SpreadsheetModePr
                     <td className={tdStyles}>{row.time_lodged ?? "—"}</td>
                     <td className={tdStyles}>{row.section}</td>
                     <td className={`${tdStyles} text-right tabular-nums`}>{row.backfill_m3}</td>
-                    <td className={tdStyles}>{row.crew}</td>
+                      <td className={`${tdStyles} text-right tabular-nums`}>{row.chainage ?? "—"}</td>
                   </tr>
                 ))
               )}
@@ -238,6 +226,27 @@ export function SpreadsheetMode({ data, crew, referenceDate }: SpreadsheetModePr
               )}
             </tbody>
           </table>
+          {filtered.onsiteW.length > 0 && (
+            <div className="border-t border-[#EEECEF] px-4 py-2 text-[11px] text-zinc-700">
+              <p className="mb-1 font-medium">Qty L / task (today)</p>
+              <table className="w-full border-collapse">
+                <tbody>
+                  {Object.entries(
+                    filtered.onsiteW.reduce<Record<string, number>>((acc, row) => {
+                      const key = row.task ?? "Other";
+                      acc[key] = (acc[key] ?? 0) + row.water_litres;
+                      return acc;
+                    }, {})
+                  ).map(([task, litres]) => (
+                    <tr key={task}>
+                      <td className="py-0.5 pr-2 text-left">{task}</td>
+                      <td className="py-0.5 text-right tabular-nums">{litres}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </section>
     </div>

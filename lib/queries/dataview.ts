@@ -20,7 +20,7 @@ export type PipeDataViewRow = {
   time_lodged?: string;
   section: string;
   pipes_laid: number;
-  crew: string;
+  pipe_id: string;
 };
 
 export type BackfillDataViewRow = {
@@ -28,7 +28,7 @@ export type BackfillDataViewRow = {
   time_lodged?: string;
   section: string;
   backfill_m3: number;
-  crew: string;
+  chainage: number;
 };
 
 export type WaterDataViewRow = {
@@ -38,6 +38,7 @@ export type WaterDataViewRow = {
   water_litres: number;
   destination: string;
   truck_id?: string;
+  task?: string;
 };
 
 export async function fetchPipeDataView(
@@ -58,7 +59,7 @@ export async function fetchPipeDataView(
 
     let query = supabase
       .from("drainer_pipe_records")
-      .select("id, date_installed, time_installed, section_id, lodged_at")
+      .select("id, pipe_fitting_id, date_installed, time_installed, section_id, lodged_at")
       .gte("date_installed", startStr)
       .lte("date_installed", endStr)
       .not("date_installed", "is", null)
@@ -80,64 +81,41 @@ export async function fetchPipeDataView(
     const { data: crews } = await supabase.from("crews").select("id, name");
     const crewMap = new Map((crews ?? []).map((c) => [c.id, c.name ?? "—"]));
 
-    const byDate: Record<string, typeof rows> = {};
-    for (const r of rows) {
-      const d = (r as { date_installed?: string }).date_installed;
-      if (d) {
-        if (!byDate[d]) byDate[d] = [];
-        byDate[d].push(r);
+    const rowsSorted = [...rows].sort((a, b) =>
+      String((a as { date_installed?: string }).date_installed ?? "").localeCompare(
+        String((b as { date_installed?: string }).date_installed ?? "")
+      )
+    );
+
+    const result: PipeDataViewRow[] = rowsSorted.map((r) => {
+      const date = (r as { date_installed?: string }).date_installed ?? "";
+      const ti = (r as { time_installed?: string }).time_installed;
+      const la = (r as { lodged_at?: string }).lodged_at;
+      let timeLodged = "—";
+      if (ti) timeLodged = String(ti).slice(0, 5);
+      else if (la) {
+        timeLodged = new Date(la).toLocaleTimeString("en-AU", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+          timeZone: "Australia/Perth",
+        });
       }
-    }
 
-    const result: PipeDataViewRow[] = Object.entries(byDate)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, records]) => {
-        const withTime = records
-          .filter((r) => (r as { lodged_at?: string }).lodged_at || (r as { time_installed?: string }).time_installed)
-          .sort((a, b) =>
-            String((b as { lodged_at?: string }).lodged_at ?? "").localeCompare(
-              String((a as { lodged_at?: string }).lodged_at ?? "")
-            )
-          );
-        const last = withTime[0] ?? records[records.length - 1];
-        let timeLodged = "—";
-        if (last) {
-          const ti = (last as { time_installed?: string }).time_installed;
-          const la = (last as { lodged_at?: string }).lodged_at;
-          if (ti) timeLodged = String(ti).slice(0, 5);
-          else if (la)
-            timeLodged = new Date(la).toLocaleTimeString("en-AU", {
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: false,
-              timeZone: "Australia/Perth",
-            });
-        }
+      const sid = (r as { section_id?: string }).section_id;
+      const secInfo = sid ? sectionMap.get(sid) : null;
+      const sectionName = secInfo?.name ?? sid ?? "—";
+      const fittingId = (r as { pipe_fitting_id?: string }).pipe_fitting_id;
+      const id = fittingId && fittingId.trim().length > 0 ? fittingId : String((r as { id: string }).id);
 
-        const sectionCounts: Record<string, number> = {};
-        for (const r of records) {
-          const sid = (r as { section_id?: string }).section_id;
-          if (sid) {
-            const name = sectionMap.get(sid)?.name ?? sid;
-            sectionCounts[name] = (sectionCounts[name] ?? 0) + 1;
-          }
-        }
-        const topSection = Object.entries(sectionCounts).sort(([, a], [, b]) => b - a)[0]?.[0] ?? "—";
-
-        const firstWithSection = records.find((r) => (r as { section_id?: string }).section_id);
-        const secInfo = firstWithSection
-          ? sectionMap.get((firstWithSection as { section_id?: string }).section_id)
-          : null;
-        const crewName = secInfo?.crewId ? crewMap.get(secInfo.crewId) ?? "—" : "—";
-
-        return {
-          date,
-          time_lodged: timeLodged,
-          section: topSection,
-          pipes_laid: records.length,
-          crew: crewName,
-        };
-      });
+      return {
+        date,
+        time_lodged: timeLodged,
+        section: sectionName,
+        pipes_laid: 1,
+        pipe_id: id,
+      };
+    });
 
     return { data: result, isMock: false };
   } catch (err) {
@@ -196,68 +174,35 @@ export async function fetchBackfillDataView(
     const { data: crews } = await supabase.from("crews").select("id, name");
     const crewMap = new Map((crews ?? []).map((c) => [c.id, c.name ?? "—"]));
 
-    const byDayLoc: Record<string, Record<string, number[]>> = {};
-    for (const r of rows) {
+    const rowsSorted = [...rows].sort((a, b) =>
+      String((a as { recorded_at?: string }).recorded_at ?? "").localeCompare(
+        String((b as { recorded_at?: string }).recorded_at ?? "")
+      )
+    );
+
+    const result: BackfillDataViewRow[] = rowsSorted.map((r) => {
       const rawTs = (r as { recorded_at?: string; created_at?: string }).recorded_at ?? (r as { created_at?: string }).created_at;
       const day = rawTs ? toPerthDate(String(rawTs)) : "";
+      const timeLodged = rawTs
+        ? new Date(String(rawTs)).toLocaleTimeString("en-AU", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+            timeZone: "Australia/Perth",
+          })
+        : "—";
       const locId = (r as { location_id?: string }).location_id;
-      if (!day || !locId) continue;
-      if (!byDayLoc[day]) byDayLoc[day] = {};
-      if (!byDayLoc[day][locId]) byDayLoc[day][locId] = [];
-      byDayLoc[day][locId].push(Number((r as { chainage?: unknown }).chainage));
-    }
+      const locInfo = locId ? locMap.get(locId) : undefined;
+      const ch = Number((r as { chainage?: unknown }).chainage) || 0;
 
-    const result: BackfillDataViewRow[] = Object.entries(byDayLoc)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, locations]) => {
-        let totalMeters = 0;
-        let mainLocId = "";
-        let maxRecords = 0;
-
-        for (const [locId, chainages] of Object.entries(locations)) {
-          if (chainages.length >= 1) {
-            totalMeters += Math.max(...chainages) - Math.min(...chainages);
-          }
-          if (chainages.length > maxRecords) {
-            maxRecords = chainages.length;
-            mainLocId = locId;
-          }
-        }
-
-        const dayRecords = rows.filter(
-          (r) =>
-            toPerthDate(
-              String(
-                (r as { recorded_at?: string }).recorded_at ?? (r as { created_at?: string }).created_at ?? ""
-              )
-            ) === date
-        );
-        const lastRecord = [...dayRecords].sort((a, b) =>
-          String((b as { created_at?: string }).created_at ?? "").localeCompare(
-            String((a as { created_at?: string }).created_at ?? "")
-          )
-        )[0];
-
-        const timeLodged = lastRecord?.created_at
-          ? new Date((lastRecord as { created_at: string }).created_at).toLocaleTimeString("en-AU", {
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: false,
-              timeZone: "Australia/Perth",
-            })
-          : "—";
-
-        const locInfo = locMap.get(mainLocId);
-        const crewName = locInfo?.crewId ? crewMap.get(locInfo.crewId) ?? "—" : "—";
-
-        return {
-          date,
-          time_lodged: timeLodged,
-          section: locInfo?.name ?? mainLocId ?? "—",
-          backfill_m3: Math.round(totalMeters * 10) / 10,
-          crew: crewName,
-        };
-      });
+      return {
+        date: day,
+        time_lodged: timeLodged,
+        section: locInfo?.name ?? locId ?? "—",
+        backfill_m3: ch,
+        chainage: ch,
+      };
+    });
 
     return { data: result, isMock: false };
   } catch (err) {
@@ -268,7 +213,7 @@ export async function fetchBackfillDataView(
 
 export async function fetchWaterDataView(
   days: number,
-  crewId?: string | null,
+  crewCode?: string | null,
   endDate?: string
 ): Promise<{ data: WaterDataViewRow[]; isMock: boolean }> {
   try {
@@ -283,12 +228,12 @@ export async function fetchWaterDataView(
 
     let query = supabase
       .from("wc_water_logs")
-      .select("id, created_at, volume_liters, truck_id, destination_id, crew_id")
+      .select("id, created_at, volume_liters, truck_id, destination_id, crew, task_id, wc_tasks(name)")
       .gte("created_at", startISO)
       .lte("created_at", endISO)
       .order("created_at", { ascending: true });
 
-    if (crewId) query = query.eq("crew_id", crewId);
+    if (crewCode) query = query.eq("crew", crewCode);
 
     const { data: rows, error } = await query;
     if (error) throw error;
@@ -297,18 +242,13 @@ export async function fetchWaterDataView(
     const truckIds = [...new Set(rows.map((r) => (r as { truck_id?: string }).truck_id).filter(Boolean))];
     const destIds = [...new Set(rows.map((r) => (r as { destination_id?: string }).destination_id).filter(Boolean))];
 
-    let trucks: { id: string; name?: string }[] = [];
     let dests: { id: string; name?: string }[] = [];
-    if (truckIds.length > 0) {
-      const r = await supabase.from("wc_vehicles").select("id, name").in("id", truckIds);
-      trucks = r.data ?? [];
-    }
     if (destIds.length > 0) {
       const r = await supabase.from("locations").select("id, name").in("id", destIds);
       dests = r.data ?? [];
     }
 
-    const truckMap = new Map(trucks.map((t) => [t.id, t.name ?? "—"]));
+    const truckMap = new Map<string, string>();
     const destMap = new Map(dests.map((d) => [d.id, d.name ?? "Site"]));
 
     const result: WaterDataViewRow[] = (rows ?? []).map((r) => {
@@ -328,6 +268,8 @@ export async function fetchWaterDataView(
         : "—";
       const destId = (r as { destination_id?: string }).destination_id;
       const destName = destId ? destMap.get(destId) ?? "Site" : "Site";
+      const taskRel = (r as { wc_tasks?: { name?: string } | null }).wc_tasks;
+      const taskName = taskRel?.name ?? "Other";
 
       return {
         date: dateStr,
@@ -335,7 +277,8 @@ export async function fetchWaterDataView(
         location: destName,
         water_litres: Number((r as { volume_liters?: number }).volume_liters) || 0,
         destination: destName,
-        truck_id: truckMap.get((r as { truck_id?: string }).truck_id ?? "") ?? (r as { truck_id?: string }).truck_id ?? "—",
+        truck_id: (r as { truck_id?: string }).truck_id ?? "—",
+        task: taskName,
       };
     });
 

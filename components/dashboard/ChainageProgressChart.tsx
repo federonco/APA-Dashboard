@@ -66,7 +66,7 @@ export function ChainageProgressChart({ data, historicData = [] }: Props) {
               color: "#6B7280",
             }}
           >
-            PIPE vs BACKFILL PROGRESS — {viewMode === "historic" ? "HISTORIC (6M)" : "CHAINAGE"}
+            PIPE vs BACKFILL PROGRESS — {viewMode === "historic" ? "HISTORIC (6M)" : "METRES"}
           </span>
           {historicData.length > 0 && (
             <select
@@ -149,12 +149,10 @@ export function ChainageProgressChart({ data, historicData = [] }: Props) {
               tickLine={false}
             />
             <YAxis
-              domain={["dataMax", "dataMin"]}
-              reversed
               tick={{ fill: "#6B7280", fontSize: 10, fontFamily: "'DM Mono', monospace" }}
               axisLine={false}
               tickLine={false}
-              unit=" Ch"
+              unit=" m"
             />
             <Tooltip
               contentStyle={{
@@ -164,7 +162,7 @@ export function ChainageProgressChart({ data, historicData = [] }: Props) {
                 fontFamily: "'DM Mono', monospace",
                 fontSize: "0.75rem",
               }}
-              formatter={(value: unknown) => [`${Number(value ?? 0).toFixed(1)} Ch`]}
+              formatter={(value: unknown) => [`${Number(value ?? 0).toFixed(1)} m`]}
               labelFormatter={(_, payload) =>
                 (payload?.[0]?.payload as { date?: string })?.date ?? ""
               }

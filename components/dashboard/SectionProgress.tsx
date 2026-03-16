@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { tokens } from "@/lib/designTokens";
 import type { SectionInfo, SectionProgressData } from "@/lib/queries/daily";
+import { PIPE_LENGTH_M, SCHEDULE_PIPES_PER_DAY } from "@/lib/constants";
 
 type Props = {
   sections: SectionInfo[];
@@ -21,6 +22,30 @@ export function SectionProgress({ sections, progressBySection }: Props) {
   const installedCh = progress?.installedChainage ?? 0;
   const finalCh = progress?.finalChainage ?? 0;
   const pipeCount = progress?.pipeCount ?? 0;
+
+  let expectedFinishText: string | null = null;
+  if (section && pipeCount > 0 && SCHEDULE_PIPES_PER_DAY > 0) {
+    const totalLength = Math.abs(section.endCh - section.startCh);
+    const totalPipesPlanned = totalLength > 0 ? totalLength / PIPE_LENGTH_M : 0;
+    if (totalPipesPlanned > 0) {
+      const remainingPipes = Math.max(0, totalPipesPlanned - pipeCount);
+      if (remainingPipes === 0) {
+        expectedFinishText = "Expected finish: Completed";
+      } else {
+        const daysRemaining = Math.ceil(remainingPipes / SCHEDULE_PIPES_PER_DAY);
+        const contingencyDays = 5;
+        const today = new Date();
+        const finish = new Date(today);
+        finish.setDate(today.getDate() + daysRemaining + contingencyDays);
+        const label = finish.toLocaleDateString("en-AU", {
+          weekday: "short",
+          day: "numeric",
+          month: "short",
+        });
+        expectedFinishText = `Expected finish (incl. +${contingencyDays}d contingency): ${label}`;
+      }
+    }
+  }
 
   if (sections.length === 0) {
     return (
@@ -85,7 +110,11 @@ export function SectionProgress({ sections, progressBySection }: Props) {
       >
         <TabsList variant="line" className="mb-3 h-auto w-full justify-start">
           {sections.map((s) => (
-            <TabsTrigger key={s.id} value={s.id}>
+            <TabsTrigger
+              key={s.id}
+              value={s.id}
+              className="after:hidden"
+            >
               {s.name}
             </TabsTrigger>
           ))}
@@ -142,6 +171,18 @@ export function SectionProgress({ sections, progressBySection }: Props) {
                 {pipeCount} pipes installed
               </p>
             </div>
+            {expectedFinishText && (
+              <div
+                style={{
+                  marginTop: 4,
+                  fontSize: tokens.typography.label,
+                  color: tokens.text.secondary,
+                  fontFamily: "'DM Mono', monospace",
+                }}
+              >
+                {expectedFinishText}
+              </div>
+            )}
           </div>
         </div>
       </Tabs>

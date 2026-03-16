@@ -3,10 +3,6 @@ import packageJson from "../../package.json";
 import { tokens } from "@/lib/designTokens";
 
 export function Footer() {
-  const today = new Date().toLocaleDateString("en-CA", {
-    timeZone: "Australia/Perth",
-  });
-
   return (
     <footer
       style={{
@@ -20,51 +16,54 @@ export function Footer() {
         background: tokens.theme.background,
       }}
     >
-      <a
-        href="https://readx.com.au"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="opacity-70 transition-opacity hover:opacity-100"
+      <div
+        style={{
+          fontFamily: "'Barlow Condensed', sans-serif",
+          fontWeight: 600,
+          letterSpacing: "0.05em",
+          fontSize: "0.75rem",
+          color: tokens.text.primary,
+          textAlign: "center",
+        }}
       >
-        <Image
-          src="/readx.logo.png"
-          alt="readX"
-          width={48}
-          height={14}
-          style={{ height: "14px", width: "auto" }}
-        />
-      </a>
+        APA - Dashboard
+      </div>
       <div
         style={{
           display: "flex",
           alignItems: "center",
           gap: "0.5rem",
-          fontSize: "0.65rem",
           fontFamily: "'DM Mono', monospace",
+          fontSize: "0.7rem",
           color: tokens.text.muted,
         }}
       >
-        <span
-          style={{
-            fontFamily: "'Barlow Condensed', sans-serif",
-            fontWeight: 600,
-            letterSpacing: "0.05em",
-          }}
+        <span>Created by</span>
+        <a
+          href="https://readx.com.au"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="opacity-80 transition-opacity hover:opacity-100"
         >
-          ALKIMOS PIPELINE ALLIANCE
-        </span>
-        <span>|</span>
-        <span>© 2026 APA</span>
+          <Image
+            src="/readx.logo.png"
+            alt="readX"
+            width={52}
+            height={14}
+            style={{ height: "14px", width: "auto" }}
+          />
+        </a>
       </div>
-      <span
+      <div
         style={{
           fontFamily: "'DM Mono', monospace",
-          fontSize: "0.65rem",
+          fontSize: "0.7rem",
           color: tokens.text.muted,
+          textAlign: "center",
         }}
       >
-        v{packageJson.version} · {today}
-      </span>
+        All Rights Reserved
+      </div>
     </footer>
   );
 }

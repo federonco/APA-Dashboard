@@ -15,6 +15,7 @@ import { tokens } from "@/lib/designTokens";
 import { ChartLegend } from "./ChartLegend";
 import { CustomTooltip } from "./CustomTooltip";
 import type { MonthlyDayValue } from "@/lib/queries/daily";
+import { PIPE_LENGTH_M } from "@/lib/constants";
 
 const PIPE_COLOR = "#f97316";
 const BACKFILL_COLOR = "#38bdf8";
@@ -26,9 +27,21 @@ type Props = {
 
 export function MonthlyProgressChart({ data, historicData = [] }: Props) {
   const [viewMode, setViewMode] = useState<"current" | "historic">("current");
+  const [pipesPerDay, setPipesPerDay] = useState<number>(1);
   const [visible, setVisible] = useState({ pipe: true, backfill: true });
 
-  const chartData = viewMode === "historic" && historicData.length > 0 ? historicData : data;
+  const baseData = viewMode === "historic" && historicData.length > 0 ? historicData : data;
+  const chartData = useMemo(
+    () => {
+      const targetPerDayMeters = pipesPerDay * PIPE_LENGTH_M;
+      return baseData.map((d, index) => ({
+        ...d,
+        pipeTargetCumulative: targetPerDayMeters * (index + 1),
+        pipePipesPerDay: d.pipeMetres / PIPE_LENGTH_M,
+      }));
+    },
+    [baseData, pipesPerDay]
+  );
   const toggle = (key: keyof typeof visible) => () =>
     setVisible((v) => ({ ...v, [key]: !v[key] }));
 
@@ -127,18 +140,61 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
             </select>
           )}
         </div>
-        <span
+        <div
           style={{
-            borderRadius: tokens.radius.badge,
-            background: tokens.theme.border,
-            padding: "4px 8px",
-            fontSize: tokens.typography.body,
-            fontWeight: 600,
-            color: tokens.text.primary,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            gap: 4,
           }}
         >
-          Pipe {pipeM} m · Backfill {backfillM} m
-        </span>
+          <span
+            style={{
+              borderRadius: tokens.radius.badge,
+              background: tokens.theme.border,
+              padding: "4px 8px",
+              fontSize: tokens.typography.body,
+              fontWeight: 600,
+              color: tokens.text.primary,
+            }}
+          >
+            Pipe {pipeM} m · Backfill {backfillM} m
+          </span>
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 11,
+              color: tokens.text.secondary,
+              fontFamily: "'DM Mono', monospace",
+            }}
+          >
+            <span>Target:</span>
+            <input
+              type="number"
+              min={0}
+              step={0.5}
+              value={pipesPerDay}
+              onChange={(e) =>
+                setPipesPerDay(() => {
+                  const v = Number(e.target.value);
+                  return Number.isFinite(v) && v >= 0 ? v : 0;
+                })
+              }
+              style={{
+                width: 52,
+                padding: "2px 4px",
+                borderRadius: 4,
+                border: `1px solid ${tokens.theme.border}`,
+                fontSize: 11,
+                fontFamily: "'DM Mono', monospace",
+                textAlign: "right",
+              }}
+            />
+            <span>pipes/day</span>
+          </label>
+        </div>
       </CardHeader>
       <CardContent style={{ padding: 0 }}>
         <div style={{ minHeight: 200, width: "100%" }}>
@@ -166,6 +222,15 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
                 unit=" m"
               />
               <Tooltip content={<CustomTooltip />} />
+              <Line
+                type="monotone"
+                dataKey="pipeTargetCumulative"
+                stroke="#9ca3af"
+                strokeWidth={1.5}
+                strokeDasharray="4 4"
+                dot={false}
+                name={`TARGET (${pipesPerDay} pipes/day)`}
+              />
               {visible.pipe && (
                 <Line
                   type="monotone"

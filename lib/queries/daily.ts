@@ -320,7 +320,7 @@ export async function fetchBackfillToday(
 
 // --- 3. WATER TODAY (wc_water_logs + wc_tasks, created_at, volume_liters) ---
 export async function fetchWaterToday(
-  crewId?: string | null,
+  crewCode?: string | null,
   date?: string
 ): Promise<{ data: { totalKL: number }; isMock: boolean }> {
   if (!hasSupabaseEnv()) {
@@ -332,10 +332,10 @@ export async function fetchWaterToday(
 
     let query = supabase
       .from("wc_water_logs")
-      .select("volume_liters")
+      .select("volume_liters, crew")
       .gte("created_at", start)
       .lte("created_at", end);
-    if (crewId) query = query.eq("crew_id", crewId);
+    if (crewCode) query = query.eq("crew", crewCode);
 
     const { data: rows, error } = await query;
     if (error) throw error;
@@ -354,7 +354,7 @@ export async function fetchWaterToday(
 
 // --- 4. WATER BY TASK (wc_water_logs JOIN wc_tasks) ---
 export async function fetchWaterByTask(
-  crewId?: string | null,
+  crewCode?: string | null,
   date?: string
 ): Promise<{ data: WaterByActivity[]; isMock: boolean }> {
   if (!hasSupabaseEnv()) {
@@ -366,22 +366,13 @@ export async function fetchWaterByTask(
 
     let query = supabase
       .from("wc_water_logs")
-      .select("volume_liters, task_id, wc_tasks(name)")
+      .select("volume_liters, task_id, wc_tasks(name), crew")
       .gte("created_at", start)
       .lte("created_at", end);
-    if (crewId) query = query.eq("crew_id", crewId);
+    if (crewCode) query = query.eq("crew", crewCode);
 
     const { data: rows, error } = await query;
     if (error) throw error;
-
-    console.log("[DEBUG] fetchWaterByTask", {
-      date: getTargetDate(date),
-      start,
-      end,
-      crewId: crewId ?? "all",
-      rowCount: rows?.length ?? 0,
-      sample: rows?.slice(0, 3),
-    });
 
     const byTask: Record<string, number> = {};
     for (const r of rows ?? []) {
@@ -494,10 +485,10 @@ export async function getTodayBackfillProgress(
 }
 
 export async function getTodayWaterByActivity(
-  crewId?: string | null,
+  crewCode?: string | null,
   date?: string
 ): Promise<WaterByActivity[]> {
-  const res = await fetchWaterByTask(crewId, date);
+  const res = await fetchWaterByTask(crewCode, date);
   return res.data;
 }
 
@@ -706,84 +697,28 @@ export async function getChainageProgressData(
 ): Promise<ChainageProgressValue[]> {
   const monthlyProgress = await getCurrentMonthDailyProgress(crewId);
   if (!monthlyProgress.length) return [];
+  const baseProgress = monthlyProgress.slice(-5);
+  if (!baseProgress.length) return [];
 
   if (!hasSupabaseEnv()) {
-    const initial = 2000;
-    return monthlyProgress.map((r, i) => ({
+    return baseProgress.map((r, i) => ({
       date: r.date,
       label: r.label,
-      pipeChainage: Math.round((initial - r.pipeMetresCumulative) * 10) / 10,
-      backfillChainage: Math.round((initial - (i + 1) * 100) * 10) / 10,
+      pipeChainage: r.pipeMetresCumulative,
+      backfillChainage: r.backfillMetresCumulative,
     }));
   }
 
   try {
-    const supabase = createAdminClient();
-    const workingDays = monthlyProgress.map((r) => r.date);
-    const { start: startTs } = dayStartEndPerth(workingDays[0]);
-    const { end: endTs } = dayStartEndPerth(workingDays[workingDays.length - 1]);
-
-    let pspQuery = supabase
-      .from("psp_records")
-      .select("recorded_at, chainage")
-      .gte("recorded_at", startTs)
-      .lte("recorded_at", endTs)
-      .not("chainage", "is", null);
-
-    if (crewId) {
-      const { data: locs } = await supabase
-        .from("locations")
-        .select("id")
-        .eq("location_type", "psp")
-        .eq("crew_id", crewId);
-      const locIds = locs?.map((l) => l.id) ?? [];
-      if (locIds.length > 0) pspQuery = pspQuery.in("location_id", locIds);
-    }
-
-    const { data: pspRows, error } = await pspQuery;
-    if (error) throw error;
-
-    const byDay: Record<string, number[]> = {};
-    for (const r of pspRows ?? []) {
-      const rawTs = (r as { recorded_at?: string }).recorded_at;
-      if (!rawTs) continue;
-      const day = toPerthDate(String(rawTs));
-      const ch = Number((r as { chainage?: unknown }).chainage);
-      if (!day || isNaN(ch) || !workingDays.includes(day)) continue;
-      if (!byDay[day]) byDay[day] = [];
-      byDay[day].push(ch);
-    }
-
-    let initialChainage =
-      pspRows?.length && pspRows.some((r) => !isNaN(Number((r as { chainage?: unknown }).chainage)))
-        ? Math.max(
-            ...pspRows
-              .map((r) => Number((r as { chainage?: unknown }).chainage))
-              .filter((n) => !isNaN(n))
-          )
-        : 0;
-    if (initialChainage <= 0) {
-      const maxPipe = Math.max(...monthlyProgress.map((r) => r.pipeMetresCumulative));
-      initialChainage = maxPipe + 100;
-    }
-
-    let runningMin = initialChainage;
-    const backfillByDay: Record<string, number> = {};
-    for (const d of workingDays) {
-      const dayChainages = byDay[d] ?? [];
-      if (dayChainages.length > 0) runningMin = Math.min(runningMin, ...dayChainages);
-      backfillByDay[d] = Math.round(runningMin * 10) / 10;
-    }
-
-    return monthlyProgress.map((r) => ({
+    return baseProgress.map((r) => ({
       date: r.date,
       label: r.label,
-      pipeChainage: Math.round((initialChainage - r.pipeMetresCumulative) * 10) / 10,
-      backfillChainage: backfillByDay[r.date] ?? initialChainage,
+      pipeChainage: r.pipeMetresCumulative,
+      backfillChainage: r.backfillMetresCumulative,
     }));
   } catch (err) {
     console.error("[Dashboard] getChainageProgressData failed:", err);
-    return monthlyProgress.map((r) => ({
+    return baseProgress.map((r) => ({
       date: r.date,
       label: r.label,
       pipeChainage: 0,

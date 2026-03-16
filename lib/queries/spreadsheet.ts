@@ -11,7 +11,7 @@ export type OnSiteDRow = {
   section: string;
   pipes_laid: number;
   joint_count?: number;
-  crew: string;
+  pipe_id?: string;
 };
 
 export type OnSiteBRow = {
@@ -20,7 +20,7 @@ export type OnSiteBRow = {
   section: string;
   backfill_m3: number;
   vehicle_count?: number;
-  crew: string;
+  chainage?: number;
 };
 
 export type OnSiteWRow = {
@@ -30,6 +30,7 @@ export type OnSiteWRow = {
   water_litres: number;
   destination: string;
   truck_id?: string;
+  task?: string;
 };
 
 export type SpreadsheetData = {
@@ -56,7 +57,7 @@ function mockSpreadsheetData(crew: string): SpreadsheetData {
       section: `Section ${i + 1}`,
       pipes_laid: 18 + (i % 5),
       joint_count: 18 + (i % 5),
-      crew,
+      pipe_id: undefined,
     })),
     onsiteB: days.map((date, i) => ({
       date,
@@ -64,7 +65,7 @@ function mockSpreadsheetData(crew: string): SpreadsheetData {
       section: `Section ${i + 1}`,
       backfill_m3: 70 + (i % 15),
       vehicle_count: 2,
-      crew,
+      chainage: undefined,
     })),
     onsiteW: days.map((date, i) => ({
       date,
@@ -84,13 +85,12 @@ export async function getSpreadsheetData(
 ): Promise<SpreadsheetData> {
   try {
     const crewForQueries = crew === "Global" ? "A" : crew;
-    const crewId = await getCrewId(crewForQueries);
     const endStr = selectedDate ?? new Date().toLocaleDateString("en-CA", { timeZone: "Australia/Perth" });
 
     const [pipeRes, backfillRes, waterRes] = await Promise.all([
-      fetchPipeDataView(7, crewId ?? undefined, endStr),
-      fetchBackfillDataView(7, crewId ?? undefined, endStr),
-      fetchWaterDataView(7, crewId ?? undefined, endStr),
+      fetchPipeDataView(7, await getCrewId(crewForQueries), endStr),
+      fetchBackfillDataView(7, await getCrewId(crewForQueries), endStr),
+      fetchWaterDataView(7, crewForQueries, endStr),
     ]);
 
     const mockFlags = {
@@ -110,14 +110,14 @@ export async function getSpreadsheetData(
         time_lodged: r.time_lodged,
         section: r.section,
         pipes_laid: r.pipes_laid,
-        crew: r.crew,
+        pipe_id: r.pipe_id,
       })),
       onsiteB: backfillRes.isMock ? mock.onsiteB : backfillRes.data.map((r) => ({
         date: r.date,
         time_lodged: r.time_lodged,
         section: r.section,
         backfill_m3: r.backfill_m3,
-        crew: r.crew,
+        chainage: r.chainage,
       })),
       onsiteW: waterRes.isMock ? mock.onsiteW : waterRes.data.map((r) => ({
         date: r.date,
@@ -126,6 +126,7 @@ export async function getSpreadsheetData(
         water_litres: r.water_litres,
         destination: r.destination,
         truck_id: r.truck_id,
+        task: r.task,
       })),
       mockFlags,
     };

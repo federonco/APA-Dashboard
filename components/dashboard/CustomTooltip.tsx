@@ -36,8 +36,10 @@ export function CustomTooltip({ active, payload, label }: Partial<TooltipContent
             key === "pipeMetres" || key === "pipeMetresCumulative" || entry.name === "PIPE LAID";
           let suffix = "";
           if (isPipeMetres && typeof entry.value === "number") {
-            const pipes = entry.value / PIPE_LENGTH_M;
-            suffix = ` (${pipes.toFixed(1)} pipes/day)`;
+            const payload = entry.payload as { pipeMetres?: number } | undefined;
+            const dailyMetres = typeof payload?.pipeMetres === "number" ? payload.pipeMetres : entry.value;
+            const pipes = dailyMetres / PIPE_LENGTH_M;
+            suffix = ` (${pipes.toFixed(1)} pipes)`;
           }
           return (
             <div

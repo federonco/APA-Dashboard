@@ -192,7 +192,7 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
                 textAlign: "right",
               }}
             />
-            <span>pipes/day</span>
+            <span>pipes</span>
           </label>
         </div>
       </CardHeader>
@@ -229,7 +229,7 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
                 strokeWidth={1.5}
                 strokeDasharray="4 4"
                 dot={false}
-                name={`TARGET (${pipesPerDay} pipes/day)`}
+                name={`TARGET (${pipesPerDay} pipes)`}
               />
               {visible.pipe && (
                 <Line

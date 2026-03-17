@@ -152,7 +152,7 @@ export async function fetchBackfillDataView(
 
     let query = supabase
       .from("psp_records")
-      .select("id, chainage, recorded_at, created_at, location_id")
+      .select("id, chainage, recorded_at, location_id")
       .gte("recorded_at", startISO)
       .lte("recorded_at", endISO)
       .not("chainage", "is", null)
@@ -181,7 +181,7 @@ export async function fetchBackfillDataView(
     );
 
     const result: BackfillDataViewRow[] = rowsSorted.map((r) => {
-      const rawTs = (r as { recorded_at?: string; created_at?: string }).recorded_at ?? (r as { created_at?: string }).created_at;
+      const rawTs = (r as { recorded_at?: string }).recorded_at;
       const day = rawTs ? toPerthDate(String(rawTs)) : "";
       const timeLodged = rawTs
         ? new Date(String(rawTs)).toLocaleTimeString("en-AU", {
@@ -228,7 +228,7 @@ export async function fetchWaterDataView(
 
     let query = supabase
       .from("wc_water_logs")
-      .select("id, created_at, volume_liters, truck_id, destination_id, crew, task_id, wc_tasks(name)")
+      .select("id, created_at, volume_liters, vehicle_id, destination_id, crew_id, task_id, wc_tasks(name)")
       .gte("created_at", startISO)
       .lte("created_at", endISO)
       .order("created_at", { ascending: true });
@@ -239,7 +239,7 @@ export async function fetchWaterDataView(
     if (error) throw error;
     if (!rows?.length) return { data: [], isMock: false };
 
-    const truckIds = [...new Set(rows.map((r) => (r as { truck_id?: string }).truck_id).filter(Boolean))];
+    const truckIds = [...new Set(rows.map((r) => (r as { vehicle_id?: string }).vehicle_id).filter(Boolean))];
     const destIds = [...new Set(rows.map((r) => (r as { destination_id?: string }).destination_id).filter(Boolean))];
 
     let dests: { id: string; name?: string }[] = [];
@@ -249,6 +249,17 @@ export async function fetchWaterDataView(
     }
 
     const truckMap = new Map<string, string>();
+    if (truckIds.length > 0) {
+      const { data: vehicles } = await supabase
+        .from("wc_vehicles")
+        .select("id, name")
+        .in("id", truckIds);
+      for (const v of vehicles ?? []) {
+        const id = (v as { id?: string }).id;
+        const name = (v as { name?: string }).name;
+        if (id) truckMap.set(id, name || id);
+      }
+    }
     const destMap = new Map(dests.map((d) => [d.id, d.name ?? "Site"]));
 
     const result: WaterDataViewRow[] = (rows ?? []).map((r) => {
@@ -277,7 +288,10 @@ export async function fetchWaterDataView(
         location: destName,
         water_litres: Number((r as { volume_liters?: number }).volume_liters) || 0,
         destination: destName,
-        truck_id: (r as { truck_id?: string }).truck_id ?? "—",
+        truck_id:
+          truckMap.get((r as { vehicle_id?: string }).vehicle_id ?? "") ??
+          (r as { vehicle_id?: string }).vehicle_id ??
+          "—",
         task: taskName,
       };
     });

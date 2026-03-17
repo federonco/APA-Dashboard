@@ -29,9 +29,10 @@ function getColor(activity: string, index: number): string {
 type Props = {
   data: WaterByActivity[];
   vehicleLitres?: number;
+  activeVehicles?: number;
 };
 
-export function WaterConsumptionChart({ data, vehicleLitres = 0 }: Props) {
+export function WaterConsumptionChart({ data, vehicleLitres = 0, activeVehicles }: Props) {
   const baseItems = useMemo(() => {
     const items = data.map((d, i) => ({
       name: d.activity,
@@ -87,16 +88,29 @@ export function WaterConsumptionChart({ data, vehicleLitres = 0 }: Props) {
           alignItems: "flex-start",
         }}
       >
-        <span
-          style={{
-            fontSize: tokens.typography.subtitle,
-            fontWeight: 500,
-            color: tokens.text.secondary,
-            letterSpacing: "0.02em",
-          }}
-        >
-          WATER CONSUMPTION — TODAY
-        </span>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span
+            style={{
+              fontSize: tokens.typography.subtitle,
+              fontWeight: 500,
+              color: tokens.text.secondary,
+              letterSpacing: "0.02em",
+            }}
+          >
+            WATER CONSUMPTION — TODAY
+          </span>
+          {typeof activeVehicles === "number" && (
+            <span
+              style={{
+                fontSize: tokens.typography.label,
+                color: tokens.text.muted,
+                fontWeight: 400,
+              }}
+            >
+              Active vehicles: {activeVehicles}
+            </span>
+          )}
+        </div>
         <span
           style={{
             borderRadius: tokens.radius.badge,

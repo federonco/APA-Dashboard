@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import type { SpreadsheetData } from "@/lib/queries/spreadsheet";
 import {
   filterByPeriod,
   formatDate,
+  type PeriodFilter,
 } from "@/lib/utils/spreadsheetFormat";
 
 type SpreadsheetModeProps = {
@@ -18,7 +19,7 @@ export function SpreadsheetMode({ data, crew, referenceDate }: SpreadsheetModePr
   const bRef = useRef<HTMLDivElement>(null);
   const wRef = useRef<HTMLDivElement>(null);
 
-  const period: "day" = "day";
+  const [period, setPeriod] = useState<PeriodFilter>("day");
 
   const filtered = {
     onsiteD: filterByPeriod(data.onsiteD, period, referenceDate),
@@ -71,6 +72,23 @@ export function SpreadsheetMode({ data, crew, referenceDate }: SpreadsheetModePr
 
   return (
     <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <div className="text-[11px] text-zinc-600">
+          <span className="font-medium">Crew:</span> {crewLabel}
+        </div>
+        <div className="flex items-center gap-2 text-[11px] text-zinc-600">
+          <span className="font-medium">Period:</span>
+          <select
+            value={period}
+            onChange={(e) => setPeriod(e.target.value as PeriodFilter)}
+            className="rounded border border-[#EEECEF] bg-white px-2 py-1 text-[11px]"
+          >
+            <option value="day">Day</option>
+            <option value="week">Week</option>
+            <option value="month">Month</option>
+          </select>
+        </div>
+      </div>
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className={sectionTitleStyles}>
@@ -81,13 +99,6 @@ export function SpreadsheetMode({ data, crew, referenceDate }: SpreadsheetModePr
               </span>
             )}
           </h2>
-          <button
-            type="button"
-            onClick={() => printTable(dRef, "OnSite-D Pipes")}
-            className="rounded-lg border border-[#EEECEF] px-3 py-1 text-[11px] text-zinc-600 hover:bg-[#ECEAF1] hover:text-zinc-800"
-          >
-            Print OnSite-D
-          </button>
         </div>
         <div ref={dRef} className={tableStyles}>
           <table className="w-full min-w-[400px]">
@@ -133,13 +144,6 @@ export function SpreadsheetMode({ data, crew, referenceDate }: SpreadsheetModePr
               </span>
             )}
           </h2>
-          <button
-            type="button"
-            onClick={() => printTable(bRef, "OnSite-B Backfill")}
-            className="rounded-lg border border-[#EEECEF] px-3 py-1 text-[11px] text-zinc-600 hover:bg-[#ECEAF1] hover:text-zinc-800"
-          >
-            Print OnSite-B
-          </button>
         </div>
         <div ref={bRef} className={tableStyles}>
           <table className="w-full min-w-[400px]">
@@ -185,13 +189,6 @@ export function SpreadsheetMode({ data, crew, referenceDate }: SpreadsheetModePr
               </span>
             )}
           </h2>
-          <button
-            type="button"
-            onClick={() => printTable(wRef, "OnSite-W Water")}
-            className="rounded-lg border border-[#EEECEF] px-3 py-1 text-[11px] text-zinc-600 hover:bg-[#ECEAF1] hover:text-zinc-800"
-          >
-            Print OnSite-W
-          </button>
         </div>
         <div ref={wRef} className={tableStyles}>
           <table className="w-full min-w-[400px]">
@@ -226,27 +223,6 @@ export function SpreadsheetMode({ data, crew, referenceDate }: SpreadsheetModePr
               )}
             </tbody>
           </table>
-          {filtered.onsiteW.length > 0 && (
-            <div className="border-t border-[#EEECEF] px-4 py-2 text-[11px] text-zinc-700">
-              <p className="mb-1 font-medium">Qty L / task (today)</p>
-              <table className="w-full border-collapse">
-                <tbody>
-                  {Object.entries(
-                    filtered.onsiteW.reduce<Record<string, number>>((acc, row) => {
-                      const key = row.task ?? "Other";
-                      acc[key] = (acc[key] ?? 0) + row.water_litres;
-                      return acc;
-                    }, {})
-                  ).map(([task, litres]) => (
-                    <tr key={task}>
-                      <td className="py-0.5 pr-2 text-left">{task}</td>
-                      <td className="py-0.5 text-right tabular-nums">{litres}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
         </div>
       </section>
     </div>

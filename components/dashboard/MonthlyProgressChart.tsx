@@ -148,18 +148,6 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
             gap: 4,
           }}
         >
-          <span
-            style={{
-              borderRadius: tokens.radius.badge,
-              background: tokens.theme.border,
-              padding: "4px 8px",
-              fontSize: tokens.typography.body,
-              fontWeight: 600,
-              color: tokens.text.primary,
-            }}
-          >
-            Pipe {pipeM} m · Backfill {backfillM} m
-          </span>
           <label
             style={{
               display: "flex",

@@ -1,6 +1,7 @@
 import {
   getCrewId,
   getTodayWaterByActivity,
+  getActiveVehicleCount,
   fetchPipesToday,
   fetchBackfillToday,
   fetchWaterToday,
@@ -51,6 +52,7 @@ export default async function Page({ searchParams }: Props) {
     backfillTodayRes,
     waterTodayRes,
     waterByActivity,
+    activeVehicleCount,
     currentMonthProgress,
     historicProgress,
     chainageProgressData,
@@ -60,6 +62,7 @@ export default async function Page({ searchParams }: Props) {
     fetchBackfillToday(crewId ?? undefined, selectedDate),
     fetchWaterToday(crewForQueries, selectedDate),
     getTodayWaterByActivity(crewForQueries, selectedDate),
+    getActiveVehicleCount(crewForQueries, selectedDate),
     getCurrentMonthDailyProgress(crewId ?? undefined),
     getHistoricMonthlyProgress(crewId ?? undefined),
     getChainageProgressData(crewId ?? undefined),
@@ -130,7 +133,7 @@ export default async function Page({ searchParams }: Props) {
                 />
               </div>
               <div className="col-span-1 h-full">
-                <WaterConsumptionChart data={waterByActivity} />
+                <WaterConsumptionChart data={waterByActivity} activeVehicles={activeVehicleCount} />
               </div>
             </div>
             <ChainageProgressChart data={chainageProgressData} historicData={historicChainageProgressData} />

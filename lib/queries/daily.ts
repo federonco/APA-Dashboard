@@ -492,12 +492,14 @@ export async function getTodayWaterByActivity(
   return res.data;
 }
 
-/** Vehicles defined in wc_vehicles with at least one wc_water_logs record on the given day */
+/** Vehicles defined in wc_vehicles with at least one wc_water_logs record on the given day.
+ * Returns a comma-separated list of vehicle names/IDs.
+ */
 export async function getActiveVehicleCount(
   crewCode?: string | null,
   date?: string
-): Promise<number> {
-  if (!hasSupabaseEnv()) return 0;
+): Promise<string> {
+  if (!hasSupabaseEnv()) return "";
   try {
     const supabase = createAdminClient();
     const { start, end } = dayStartEndPerth(date);
@@ -505,7 +507,7 @@ export async function getActiveVehicleCount(
     // 1) Get all active vehicles (by id)
     const { data: vehicles, error: vehiclesError } = await supabase
       .from("wc_vehicles")
-      .select("id, active")
+      .select("id, name, active")
       .eq("active", true);
     if (vehiclesError) throw vehiclesError;
 
@@ -516,7 +518,14 @@ export async function getActiveVehicleCount(
           .filter((id): id is string => !!id)
       )
     );
-    if (!vehicleIds.length) return 0;
+    if (!vehicleIds.length) return "";
+
+    const vehicleNameMap = new Map<string, string>();
+    for (const v of vehicles ?? []) {
+      const id = (v as { id?: string | null }).id;
+      const name = (v as { name?: string | null }).name;
+      if (id) vehicleNameMap.set(id, name || id);
+    }
 
     // 2) Logs for those vehicles on the given day (and crew if provided)
     let logsQuery = supabase
@@ -535,10 +544,11 @@ export async function getActiveVehicleCount(
         .map((r) => (r as { vehicle_id?: string | null }).vehicle_id)
         .filter((id): id is string => !!id)
     );
-    return active.size;
+    const labels = Array.from(active).map((id) => vehicleNameMap.get(id) ?? id);
+    return labels.join(", ");
   } catch (err) {
     console.error("[Dashboard] getActiveVehicleCount failed:", err);
-    return 0;
+    return "";
   }
 }
 

@@ -29,7 +29,7 @@ function getColor(activity: string, index: number): string {
 type Props = {
   data: WaterByActivity[];
   vehicleLitres?: number;
-  activeVehicles?: number;
+  activeVehicles?: string;
 };
 
 export function WaterConsumptionChart({ data, vehicleLitres = 0, activeVehicles }: Props) {
@@ -97,9 +97,9 @@ export function WaterConsumptionChart({ data, vehicleLitres = 0, activeVehicles 
               letterSpacing: "0.02em",
             }}
           >
-            WATER CONSUMPTION — TODAY
+            WATER USAGE TODAY
           </span>
-          {typeof activeVehicles === "number" && (
+          {activeVehicles && (
             <span
               style={{
                 fontSize: tokens.typography.label,

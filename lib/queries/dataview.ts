@@ -285,7 +285,7 @@ export async function fetchWaterDataView(
       return {
         date: dateStr,
         time_lodged: timeStr,
-        location: destName,
+        location: (r as { origin_site?: string | null }).origin_site ?? "—",
         water_litres: Number((r as { volume_liters?: number }).volume_liters) || 0,
         destination: destName,
         truck_id:

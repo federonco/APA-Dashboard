@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 import {
   LineChart,
   Line,
@@ -14,12 +13,19 @@ import {
 import { TrendBadge, computeTrend } from "./TrendBadge";
 import { CustomTooltip } from "./CustomTooltip";
 import type { DayValue } from "@/lib/queries/daily";
+import { MANROPE_STACK } from "@/lib/fonts";
+import { tokens } from "@/lib/designTokens";
+import {
+  CHART_GLOW_LINE_NAME,
+  chartLineVisual,
+  chartSeriesActiveDot,
+  chartSeriesDot,
+} from "@/lib/chartVisual";
 
 type HistoricTrendCardProps = {
   data: DayValue[];
   title: string;
   accentColor: string;
-  accentColorDark?: string;
   unit: string;
   valueLabel: string;
 };
@@ -28,7 +34,6 @@ export function HistoricTrendCard({
   data,
   title,
   accentColor,
-  accentColorDark,
   unit,
   valueLabel,
 }: HistoricTrendCardProps) {
@@ -44,13 +49,8 @@ export function HistoricTrendCard({
   const last = data[data.length - 1]?.value ?? 0;
   const { trend, percentChange } = computeTrend(first, last);
 
-  const chartData = useMemo(() =>
-    data.map((d) => ({ ...d, _dotColor: "#5F5B66" })),
-  [data]
-);
-
   return (
-    <div className="rounded-lg border border-[#EEECEF] bg-[#FCFBFB]">
+    <div className="rounded-lg border border-border bg-[#FCFBFB]">
       <div className="p-5">
         <div className="mb-3 flex items-start justify-between">
           <span
@@ -64,7 +64,7 @@ export function HistoricTrendCard({
         <div className="h-36 min-h-[9rem] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
-              data={chartData}
+              data={data}
               margin={{ top: 4, right: 4, left: -20, bottom: 0 }}
             >
               <CartesianGrid
@@ -76,48 +76,42 @@ export function HistoricTrendCard({
               <Tooltip content={<CustomTooltip />} cursor={{ stroke: "#ECEAF1", strokeWidth: 1 }} />
               <XAxis
                 dataKey="day"
-                tick={{ fill: "#6b7280", fontSize: 11, fontFamily: "var(--font-dm-mono), ui-monospace, monospace", fontWeight: 400 }}
+                tick={{ fill: "#6b7280", fontSize: 11, fontFamily: MANROPE_STACK, fontWeight: 400 }}
                 axisLine={{ stroke: "#D6D4DC" }}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fill: "#6b7280", fontSize: 11, fontFamily: "var(--font-dm-mono), ui-monospace, monospace", fontWeight: 400 }}
+                tick={{ fill: "#6b7280", fontSize: 11, fontFamily: MANROPE_STACK, fontWeight: 400 }}
                 axisLine={false}
                 tickLine={false}
                 width={28}
               />
               <ReferenceLine
                 y={avg}
-                stroke="#A6A1AF"
+                stroke={tokens.text.muted}
                 strokeDasharray="4 4"
-                strokeWidth={1}
+                strokeWidth={chartLineVisual.targetStrokeWidth}
+                strokeOpacity={chartLineVisual.projectionStrokeOpacity}
               />
               <Line
                 type="monotone"
                 dataKey="value"
-                stroke="#5F5B66"
-                strokeWidth={2}
-                dot={(props) => {
-                  const fill = (props.payload as Record<string, unknown>)?._dotColor as string ?? "#5F5B66";
-                  return (
-                    <circle
-                      cx={props.cx}
-                      cy={props.cy}
-                      r={3}
-                      fill={fill}
-                    />
-                  );
-                }}
-                activeDot={(props) => (
-                    <circle
-                      cx={props.cx}
-                      cy={props.cy}
-                      r={5}
-                      fill="#ffffff"
-                      stroke="#5F5B66"
-                      strokeWidth={1.5}
-                    />
-                  )}
+                stroke={accentColor}
+                strokeWidth={chartLineVisual.glowStrokeWidth}
+                strokeOpacity={chartLineVisual.glowStrokeOpacity}
+                dot={false}
+                activeDot={false}
+                name={CHART_GLOW_LINE_NAME}
+                legendType="none"
+              />
+              <Line
+                type="monotone"
+                dataKey="value"
+                stroke={accentColor}
+                strokeWidth={chartLineVisual.strokeWidth}
+                strokeOpacity={chartLineVisual.strokeOpacity}
+                dot={chartSeriesDot(accentColor)}
+                activeDot={chartSeriesActiveDot(accentColor)}
                 name={valueLabel}
               />
             </LineChart>

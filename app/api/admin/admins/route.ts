@@ -13,6 +13,7 @@ type AdminRow = {
 // Uses psp_admins (schema table). Match by user_id or email when user_id is null.
 async function isAdmin(userId: string, userEmail: string | null): Promise<boolean> {
   const admin = createAdminClient();
+  if (!admin) return false;
   const { data: byUserId } = await admin
     .from("psp_admins")
     .select("id")
@@ -43,6 +44,12 @@ export async function GET() {
   }
 
   const admin = createAdminClient();
+  if (!admin) {
+    return NextResponse.json(
+      { error: "Server missing SUPABASE_SERVICE_ROLE_KEY" },
+      { status: 503 }
+    );
+  }
   const { data: admins, error } = await admin
     .from("psp_admins")
     .select("id, user_id, email, crew_id");
@@ -87,6 +94,12 @@ export async function POST(req: NextRequest) {
   if (!crew_id) return NextResponse.json({ error: "Crew is required" }, { status: 400 });
 
   const admin = createAdminClient();
+  if (!admin) {
+    return NextResponse.json(
+      { error: "Server missing SUPABASE_SERVICE_ROLE_KEY" },
+      { status: 503 }
+    );
+  }
   const { data: users } = await admin.auth.admin.listUsers({ perPage: 1000 });
   const found = users?.users?.find((u) => u.email?.toLowerCase() === String(email).trim().toLowerCase());
   if (!found) {
@@ -123,6 +136,12 @@ export async function DELETE(req: NextRequest) {
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
   const admin = createAdminClient();
+  if (!admin) {
+    return NextResponse.json(
+      { error: "Server missing SUPABASE_SERVICE_ROLE_KEY" },
+      { status: 503 }
+    );
+  }
   const { data: row } = await admin
     .from("psp_admins")
     .select("user_id, email")

@@ -5,7 +5,17 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { tokens } from "@/lib/designTokens";
 import { CustomTooltip } from "./CustomTooltip";
+import {
+  WaterDonutDefs,
+  waterDonutGradientId,
+  waterDonutPaddingAngle,
+  waterDonutSectorFilterUrl,
+  waterDonutStroke,
+  waterDonutStrokeWidth,
+} from "@/lib/waterDonutVisual";
 import type { WaterByActivity } from "@/lib/queries/daily";
+
+const WATER_DONUT_DEF_PREFIX = "water-usage-donut";
 
 const ACTIVITY_COLOR_MAP: Record<string, string> = {
   "Pipe jointing": tokens.waterChart.pipeJointing,
@@ -63,8 +73,6 @@ export function WaterConsumptionChart({ data, vehicleLitres = 0, activeVehicles 
     () => baseItems.filter((i) => visible[i.name] ?? true),
     [baseItems, visible]
   );
-  const totalLitres = chartData.reduce((sum, d) => sum + d.value, 0);
-  const totalKL = (totalLitres / 1000).toFixed(1);
 
   const toggle = (name: string) => () =>
     setVisible((v) => ({ ...v, [name]: !(v[name] ?? true) }));
@@ -84,7 +92,7 @@ export function WaterConsumptionChart({ data, vehicleLitres = 0, activeVehicles 
           padding: 0,
           marginBottom: 12,
           display: "flex",
-          justifyContent: "space-between",
+          flexDirection: "column",
           alignItems: "flex-start",
         }}
       >
@@ -97,7 +105,7 @@ export function WaterConsumptionChart({ data, vehicleLitres = 0, activeVehicles 
               letterSpacing: "0.02em",
             }}
           >
-            WATER USAGE TODAY
+            Water usage today
           </span>
           {activeVehicles && (
             <span
@@ -111,26 +119,18 @@ export function WaterConsumptionChart({ data, vehicleLitres = 0, activeVehicles 
             </span>
           )}
         </div>
-        <span
-          style={{
-            borderRadius: tokens.radius.badge,
-            background: tokens.theme.border,
-            padding: "4px 8px",
-            fontSize: tokens.typography.body,
-            fontWeight: 600,
-            color: tokens.text.primary,
-          }}
-        >
-          {totalKL} kL
-        </span>
       </CardHeader>
       <CardContent style={{ padding: 0 }} className="flex-1 flex flex-col min-h-0">
         <div
-          className="flex-1 flex flex-col justify-center items-center gap-4 min-h-0"
+          className="flex min-h-0 flex-1 flex-col items-center justify-end gap-4"
         >
           <div style={{ height: 192, width: 192, flexShrink: 0 }}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
+                <WaterDonutDefs
+                  prefix={WATER_DONUT_DEF_PREFIX}
+                  segments={chartData.map(({ name, color }) => ({ name, color }))}
+                />
                 <Tooltip
                   content={<CustomTooltip />}
                   offset={100}
@@ -142,11 +142,19 @@ export function WaterConsumptionChart({ data, vehicleLitres = 0, activeVehicles 
                   cy="50%"
                   innerRadius={48}
                   outerRadius={77}
-                  paddingAngle={chartData.length > 1 ? 2 : 0}
+                  paddingAngle={
+                    chartData.length > 1 ? waterDonutPaddingAngle : 0
+                  }
                   dataKey="value"
+                  stroke={waterDonutStroke}
+                  strokeWidth={waterDonutStrokeWidth}
                 >
-                  {chartData.map((entry) => (
-                    <Cell key={entry.name} fill={entry.color} />
+                  {chartData.map((entry, i) => (
+                    <Cell
+                      key={entry.name}
+                      fill={`url(#${waterDonutGradientId(WATER_DONUT_DEF_PREFIX, i, entry.name)})`}
+                      filter={waterDonutSectorFilterUrl(WATER_DONUT_DEF_PREFIX)}
+                    />
                   ))}
                 </Pie>
               </PieChart>

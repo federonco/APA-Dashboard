@@ -61,14 +61,13 @@ export function SectionProgress({ sections, progressBySection }: Props) {
         <CardHeader style={{ padding: 0, marginBottom: 12 }}>
           <p
             style={{
-              fontSize: tokens.typography.label,
+              fontSize: tokens.typography.subtitle,
               fontWeight: 500,
               color: tokens.text.secondary,
-              letterSpacing: "0.04em",
-              textTransform: "uppercase",
+              letterSpacing: "0.02em",
             }}
           >
-            Section Progress
+            Section progress
           </p>
         </CardHeader>
         <CardContent style={{ padding: 0 }}>
@@ -93,14 +92,13 @@ export function SectionProgress({ sections, progressBySection }: Props) {
       <CardHeader style={{ padding: 0, marginBottom: 12 }}>
         <p
           style={{
-            fontSize: tokens.typography.label,
+            fontSize: tokens.typography.subtitle,
             fontWeight: 500,
             color: tokens.text.secondary,
-            letterSpacing: "0.04em",
-            textTransform: "uppercase",
+            letterSpacing: "0.02em",
           }}
         >
-          Section Progress
+          Section progress
         </p>
       </CardHeader>
       <Tabs
@@ -177,7 +175,7 @@ export function SectionProgress({ sections, progressBySection }: Props) {
                   marginTop: 4,
                   fontSize: tokens.typography.label,
                   color: tokens.text.secondary,
-                  fontFamily: "'DM Mono', monospace",
+                  fontFamily: tokens.typography.fontFamily,
                 }}
               >
                 {expectedFinishText}

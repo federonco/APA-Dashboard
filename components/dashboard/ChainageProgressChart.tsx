@@ -11,11 +11,23 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ChartLegend } from "./ChartLegend";
+import { CustomTooltip } from "./CustomTooltip";
 import type { ChainageProgressValue } from "@/lib/queries/daily";
-
-const PIPE_COLOR = "#f97316";
-const BACKFILL_COLOR = "#38bdf8";
+import { MANROPE_STACK } from "@/lib/fonts";
+import {
+  CHART_GLOW_LINE_NAME,
+  chartLineVisual,
+  chartSeriesActiveDot,
+  chartSeriesDot,
+} from "@/lib/chartVisual";
 
 type Props = {
   data: ChainageProgressValue[];
@@ -32,8 +44,8 @@ export function ChainageProgressChart({ data, historicData = [] }: Props) {
 
   const legendItems = useMemo(
     () => [
-      { label: "PIPE CHAINAGE", color: PIPE_COLOR, active: visible.pipe, onClick: toggle("pipe") },
-      { label: "BACKFILL CHAINAGE", color: BACKFILL_COLOR, active: visible.backfill, onClick: toggle("backfill") },
+      { label: "Pipe chainage", color: tokens.charts.pipeLaid, active: visible.pipe, onClick: toggle("pipe") },
+      { label: "Backfill chainage", color: tokens.charts.backfill, active: visible.backfill, onClick: toggle("backfill") },
     ],
     [visible]
   );
@@ -41,8 +53,8 @@ export function ChainageProgressChart({ data, historicData = [] }: Props) {
     return (
       <div
         style={{
-          background: "#FCFBFB",
-          border: "1px solid #E8E6EB",
+          background: tokens.theme.card,
+          border: `1px solid ${tokens.theme.border}`,
           borderRadius: "0.75rem",
           padding: "1.25rem",
           marginTop: tokens.spacing.gap,
@@ -58,26 +70,32 @@ export function ChainageProgressChart({ data, historicData = [] }: Props) {
         >
           <span
             style={{
-              fontFamily: "'Barlow Condensed', sans-serif",
-              fontSize: "0.75rem",
-              fontWeight: 600,
-              textTransform: "uppercase",
-              letterSpacing: "0.1em",
+              fontFamily: MANROPE_STACK,
+              fontSize: tokens.typography.subtitle,
+              fontWeight: 500,
+              letterSpacing: "0.02em",
               color: "#6B7280",
             }}
           >
-            PIPE vs BACKFILL PROGRESS — {viewMode === "historic" ? "HISTORIC (6M)" : "METRES"}
+            Pipe vs backfill progress — {viewMode === "historic" ? "historic (6 months)" : "metres"}
           </span>
           {historicData.length > 0 && (
-            <select
+            <Select
               value={viewMode}
-              onChange={(e) => setViewMode(e.target.value as "current" | "historic")}
-              className="rounded border px-2 py-1 text-xs"
-              style={{ borderColor: "#E8E6EB", color: "#3f3f46" }}
+              onValueChange={(v) => setViewMode(v as "current" | "historic")}
+              items={{
+                current: "Current month",
+                historic: "Historic (6 months)",
+              }}
             >
-              <option value="current">Current month</option>
-              <option value="historic">Historic (6 months)</option>
-            </select>
+              <SelectTrigger className="h-8 min-w-[10.75rem] text-xs font-medium">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="current">Current month</SelectItem>
+                <SelectItem value="historic">Historic (6 months)</SelectItem>
+              </SelectContent>
+            </Select>
           )}
         </div>
         <div
@@ -99,8 +117,8 @@ export function ChainageProgressChart({ data, historicData = [] }: Props) {
   return (
     <div
       style={{
-        background: "#FCFBFB",
-        border: "1px solid #E8E6EB",
+        background: tokens.theme.card,
+        border: `1px solid ${tokens.theme.border}`,
         borderRadius: "0.75rem",
         padding: "1.25rem",
         marginTop: tokens.spacing.gap,
@@ -116,26 +134,32 @@ export function ChainageProgressChart({ data, historicData = [] }: Props) {
       >
         <span
           style={{
-            fontFamily: "'Barlow Condensed', sans-serif",
-            fontSize: "0.75rem",
-            fontWeight: 600,
-            textTransform: "uppercase",
-            letterSpacing: "0.1em",
+            fontFamily: MANROPE_STACK,
+            fontSize: tokens.typography.subtitle,
+            fontWeight: 500,
+            letterSpacing: "0.02em",
             color: "#6B7280",
           }}
         >
-          PIPE vs BACKFILL PROGRESS — {viewMode === "historic" ? "HISTORIC (6M)" : "CHAINAGE"}
+          Pipe vs backfill progress — {viewMode === "historic" ? "historic (6 months)" : "chainage"}
         </span>
         {historicData.length > 0 && (
-          <select
+          <Select
             value={viewMode}
-            onChange={(e) => setViewMode(e.target.value as "current" | "historic")}
-            className="rounded border px-2 py-1 text-xs"
-            style={{ borderColor: "#E8E6EB", color: "#3f3f46" }}
+            onValueChange={(v) => setViewMode(v as "current" | "historic")}
+            items={{
+              current: "Current month",
+              historic: "Historic (6 months)",
+            }}
           >
-            <option value="current">Current month</option>
-            <option value="historic">Historic (6 months)</option>
-          </select>
+            <SelectTrigger className="h-8 min-w-[10.75rem] text-xs font-medium">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="current">Current month</SelectItem>
+              <SelectItem value="historic">Historic (6 months)</SelectItem>
+            </SelectContent>
+          </Select>
         )}
       </div>
       <div style={{ width: "100%", height: 220 }}>
@@ -144,49 +168,69 @@ export function ChainageProgressChart({ data, historicData = [] }: Props) {
             <CartesianGrid strokeDasharray="3 3" stroke="#ECEAF1" vertical={false} />
             <XAxis
               dataKey="label"
-              tick={{ fill: "#6B7280", fontSize: 10, fontFamily: "'DM Mono', monospace" }}
-              axisLine={{ stroke: "#E8E6EB" }}
+              tick={{ fill: "#6B7280", fontSize: 10, fontFamily: MANROPE_STACK }}
+              axisLine={{ stroke: tokens.theme.border }}
               tickLine={false}
             />
             <YAxis
-              tick={{ fill: "#6B7280", fontSize: 10, fontFamily: "'DM Mono', monospace" }}
+              tick={{ fill: "#6B7280", fontSize: 10, fontFamily: MANROPE_STACK }}
               axisLine={false}
               tickLine={false}
               unit=" m"
             />
             <Tooltip
-              contentStyle={{
-                background: "#ffffff",
-                border: "1px solid #E8E6EB",
-                borderRadius: "0.5rem",
-                fontFamily: "'DM Mono', monospace",
-                fontSize: "0.75rem",
-              }}
-              formatter={(value: unknown) => [`${Number(value ?? 0).toFixed(1)} m`]}
-              labelFormatter={(_, payload) =>
-                (payload?.[0]?.payload as { date?: string })?.date ?? ""
-              }
-              labelStyle={{ fontWeight: 600 }}
+              content={<CustomTooltip />}
+              cursor={{ stroke: tokens.theme.border, strokeWidth: 1 }}
             />
             {visible.pipe && (
-              <Line
-                type="monotone"
-                dataKey="pipeChainage"
-                stroke={PIPE_COLOR}
-                strokeWidth={2}
-                dot={{ fill: PIPE_COLOR, r: 3 }}
-                name="Pipe Chainage"
-              />
+              <>
+                <Line
+                  type="monotone"
+                  dataKey="pipeChainage"
+                  stroke={tokens.charts.pipeLaid}
+                  strokeWidth={chartLineVisual.glowStrokeWidth}
+                  strokeOpacity={chartLineVisual.glowStrokeOpacity}
+                  dot={false}
+                  activeDot={false}
+                  name={CHART_GLOW_LINE_NAME}
+                  legendType="none"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="pipeChainage"
+                  stroke={tokens.charts.pipeLaid}
+                  strokeWidth={chartLineVisual.strokeWidth}
+                  strokeOpacity={chartLineVisual.strokeOpacity}
+                  dot={chartSeriesDot(tokens.charts.pipeLaid)}
+                  activeDot={chartSeriesActiveDot(tokens.charts.pipeLaid)}
+                  name="Pipe Chainage"
+                />
+              </>
             )}
             {visible.backfill && (
-              <Line
-                type="monotone"
-                dataKey="backfillChainage"
-                stroke={BACKFILL_COLOR}
-                strokeWidth={2}
-                dot={{ fill: BACKFILL_COLOR, r: 3 }}
-                name="Backfill Chainage"
-              />
+              <>
+                <Line
+                  type="monotone"
+                  dataKey="backfillChainage"
+                  stroke={tokens.charts.backfill}
+                  strokeWidth={chartLineVisual.glowStrokeWidth}
+                  strokeOpacity={chartLineVisual.glowStrokeOpacity}
+                  dot={false}
+                  activeDot={false}
+                  name={CHART_GLOW_LINE_NAME}
+                  legendType="none"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="backfillChainage"
+                  stroke={tokens.charts.backfill}
+                  strokeWidth={chartLineVisual.strokeWidth}
+                  strokeOpacity={chartLineVisual.strokeOpacity}
+                  dot={chartSeriesDot(tokens.charts.backfill)}
+                  activeDot={chartSeriesActiveDot(tokens.charts.backfill)}
+                  name="Backfill Chainage"
+                />
+              </>
             )}
           </LineChart>
         </ResponsiveContainer>

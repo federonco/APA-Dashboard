@@ -12,9 +12,14 @@ import {
 } from "recharts";
 import { CustomTooltip } from "./CustomTooltip";
 import type { DayValue } from "@/lib/queries/daily";
-
-const PIPE_COLOR = "#f97316";
-const BACKFILL_COLOR = "#38bdf8";
+import { MANROPE_STACK } from "@/lib/fonts";
+import { tokens } from "@/lib/designTokens";
+import {
+  CHART_GLOW_LINE_NAME,
+  chartLineVisual,
+  chartSeriesActiveDot,
+  chartSeriesDot,
+} from "@/lib/chartVisual";
 
 type UnifiedHistoricTrendProps = {
   pipesData: DayValue[];
@@ -51,17 +56,17 @@ export function UnifiedHistoricTrend({
   if (combined.length === 0) {
     return (
       <div className="rounded-lg border border-[#1e1e1e] bg-[#0e0e0e] p-6">
-        <p className="font-mono text-sm text-[#999]">No historic data</p>
+        <p className="text-sm text-[#999]">No historic data</p>
       </div>
     );
   }
 
   return (
     <div className="rounded-lg border border-[#1e1e1e] bg-[#0e0e0e]">
-      <div className="h-0.5 w-full rounded-t bg-gradient-to-r from-[#f97316] to-[#38bdf8]" />
+      <div className="h-0.5 w-full rounded-t bg-gradient-to-r from-[#C9783A] to-[#6F8798]" />
       <div className="p-4">
-        <span className="font-mono text-xs font-medium uppercase tracking-widest text-[#999]">
-          5-Day Historic Trend — Pipes & Backfill
+        <span className="text-xs font-medium tracking-wide text-[#999]">
+          Five-day historic trend — pipes & backfill
         </span>
         <div className="mt-3 h-48 min-h-[12rem] w-full">
           <ResponsiveContainer width="100%" height="100%">
@@ -76,13 +81,13 @@ export function UnifiedHistoricTrend({
               />
               <XAxis
                 dataKey="day"
-                tick={{ fill: "#999", fontSize: 10, fontFamily: "monospace" }}
+                tick={{ fill: "#999", fontSize: 10, fontFamily: MANROPE_STACK }}
                 axisLine={{ stroke: "#1e1e1e" }}
                 tickLine={false}
               />
               <YAxis
                 yAxisId="left"
-                tick={{ fill: "#999", fontSize: 10, fontFamily: "monospace" }}
+                tick={{ fill: "#999", fontSize: 10, fontFamily: MANROPE_STACK }}
                 axisLine={false}
                 tickLine={false}
                 width={28}
@@ -90,7 +95,7 @@ export function UnifiedHistoricTrend({
               <YAxis
                 yAxisId="right"
                 orientation="right"
-                tick={{ fill: "#999", fontSize: 10, fontFamily: "monospace" }}
+                tick={{ fill: "#999", fontSize: 10, fontFamily: MANROPE_STACK }}
                 axisLine={false}
                 tickLine={false}
                 width={28}
@@ -104,18 +109,46 @@ export function UnifiedHistoricTrend({
                 yAxisId="left"
                 type="monotone"
                 dataKey="pipes"
-                stroke={PIPE_COLOR}
-                strokeWidth={2}
-                dot={{ fill: PIPE_COLOR, r: 3 }}
+                stroke={tokens.charts.pipeLaid}
+                strokeWidth={chartLineVisual.glowStrokeWidth}
+                strokeOpacity={chartLineVisual.glowStrokeOpacity}
+                dot={false}
+                activeDot={false}
+                name={CHART_GLOW_LINE_NAME}
+                legendType="none"
+              />
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="pipes"
+                stroke={tokens.charts.pipeLaid}
+                strokeWidth={chartLineVisual.strokeWidth}
+                strokeOpacity={chartLineVisual.strokeOpacity}
+                dot={chartSeriesDot(tokens.charts.pipeLaid)}
+                activeDot={chartSeriesActiveDot(tokens.charts.pipeLaid)}
                 name="Pipes"
               />
               <Line
                 yAxisId="right"
                 type="monotone"
                 dataKey="backfill"
-                stroke={BACKFILL_COLOR}
-                strokeWidth={2}
-                dot={{ fill: BACKFILL_COLOR, r: 3 }}
+                stroke={tokens.charts.backfill}
+                strokeWidth={chartLineVisual.glowStrokeWidth}
+                strokeOpacity={chartLineVisual.glowStrokeOpacity}
+                dot={false}
+                activeDot={false}
+                name={CHART_GLOW_LINE_NAME}
+                legendType="none"
+              />
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="backfill"
+                stroke={tokens.charts.backfill}
+                strokeWidth={chartLineVisual.strokeWidth}
+                strokeOpacity={chartLineVisual.strokeOpacity}
+                dot={chartSeriesDot(tokens.charts.backfill)}
+                activeDot={chartSeriesActiveDot(tokens.charts.backfill)}
                 name="Backfill (m)"
               />
             </LineChart>

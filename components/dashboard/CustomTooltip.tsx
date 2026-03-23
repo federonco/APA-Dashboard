@@ -3,6 +3,8 @@
 import type { TooltipContentProps } from "recharts";
 import type { ValueType, NameType } from "recharts/types/component/DefaultTooltipContent";
 import { PIPE_LENGTH_M } from "@/lib/constants";
+import { MANROPE_STACK } from "@/lib/fonts";
+import { CHART_GLOW_LINE_NAME } from "@/lib/chartVisual";
 
 export function CustomTooltip({ active, payload, label }: Partial<TooltipContentProps<ValueType, NameType>>) {
   if (!active || !payload?.length) return null;
@@ -18,28 +20,36 @@ export function CustomTooltip({ active, payload, label }: Partial<TooltipContent
     <div
       className="rounded-lg border px-3 py-2 shadow-md"
       style={{
-        fontFamily: "DM Mono, monospace",
+        fontFamily: MANROPE_STACK,
         backgroundColor: "#ffffff",
         borderColor: "#1e293b",
         borderWidth: 1,
       }}
     >
       {label != null && (
-        <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: "#1e293b" }}>
+        <p className="mb-1.5 text-xs font-semibold tracking-wide" style={{ color: "#1e293b" }}>
           {label}
         </p>
       )}
       <div className="flex flex-col gap-1.5">
         {filtered.map((entry, i) => {
-          const key = String(entry.dataKey ?? (typeof entry.name === "function" ? i : entry.name) ?? i);
+          const key = `${String(entry.dataKey ?? (typeof entry.name === "function" ? i : entry.name) ?? i)}-${i}`;
           const isPipeMetres =
-            key === "pipeMetres" || key === "pipeMetresCumulative" || entry.name === "PIPE LAID";
+            key === "pipeMetres" ||
+            key === "pipeMetresCumulative" ||
+            entry.name === "Pipe laid" ||
+            entry.name === "PIPE LAID";
           let suffix = "";
           if (isPipeMetres && typeof entry.value === "number") {
             const payload = entry.payload as { pipeMetres?: number } | undefined;
             const dailyMetres = typeof payload?.pipeMetres === "number" ? payload.pipeMetres : entry.value;
             const pipes = dailyMetres / PIPE_LENGTH_M;
             suffix = ` (${pipes.toFixed(1)} pipes)`;
+          } else if (
+            typeof entry.value === "number" &&
+            (entry.name === "Backfill" || entry.name === "Backfill (m)")
+          ) {
+            suffix = " m";
           }
           return (
             <div

@@ -27,7 +27,6 @@ export function Header({ crew }: Props) {
     <header
       style={{
         background: tokens.theme.card,
-        borderBottom: `1px solid ${tokens.theme.border}`,
         padding: tokens.spacing.cardPadding,
       }}
     >
@@ -77,34 +76,16 @@ export function Header({ crew }: Props) {
           </span>
           <Link
             href="/admin"
-            style={{
-              padding: "8px 16px",
-              fontSize: tokens.typography.body,
-              fontWeight: 600,
-              color: tokens.text.primary,
-              background: tokens.theme.card,
-              border: `1px solid ${tokens.theme.border}`,
-              borderRadius: tokens.radius.card,
-              textDecoration: "none",
-            }}
+            className="inline-block rounded-lg px-4 py-2 no-underline transition-[color,background-color] duration-150 text-[0.875rem] font-medium bg-[#D1D5DB] text-[#111827] hover:bg-[#E5E7EB]"
           >
             Admin
           </Link>
-          <a
+          <Link
             href={toggleUrl}
-            style={{
-              padding: "8px 16px",
-              fontSize: tokens.typography.body,
-              fontWeight: 600,
-              color: tokens.text.primary,
-              background: tokens.theme.card,
-              border: `1px solid ${tokens.theme.border}`,
-              borderRadius: tokens.radius.card,
-              textDecoration: "none",
-            }}
+            className="inline-block rounded-lg px-4 py-2 no-underline transition-[color,background-color] duration-150 text-[0.875rem] font-medium bg-[#D1D5DB] text-[#111827] hover:bg-[#E5E7EB]"
           >
-            📊 {isSpreadsheet ? "Dashboard" : "Data View"}
-          </a>
+            {isSpreadsheet ? "Dashboard" : "Data View"}
+          </Link>
         </div>
       </div>
     </header>

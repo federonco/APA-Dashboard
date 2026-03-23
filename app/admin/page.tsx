@@ -24,6 +24,7 @@ async function getSessionUser(): Promise<{ id: string; email: string | null } | 
 // Uses psp_admins (schema table). Match by user_id or email when user_id is null.
 async function isAdmin(userId: string, userEmail: string | null): Promise<boolean> {
   const admin = createAdminClient();
+  if (!admin) return false;
   const { data: byUserId } = await admin
     .from("psp_admins")
     .select("id")
@@ -45,6 +46,7 @@ async function isAdmin(userId: string, userEmail: string | null): Promise<boolea
 
 async function fetchAdminList(crews: CrewWithZone[]): Promise<AdminWithCrew[]> {
   const admin = createAdminClient();
+  if (!admin) return [];
   const { data: admins, error } = await admin
     .from("psp_admins")
     .select("id, user_id, email, crew_id");
@@ -65,6 +67,7 @@ async function fetchAdminList(crews: CrewWithZone[]): Promise<AdminWithCrew[]> {
 
 async function fetchCrews(): Promise<CrewWithZone[]> {
   const admin = createAdminClient();
+  if (!admin) return [];
   const { data, error } = await admin.from("crews").select("id, name, zone").order("name");
   if (error || !data) return [];
   return data.map((c) => ({ id: c.id, name: c.name ?? "", zone: c.zone ?? "" }));
@@ -103,7 +106,7 @@ export default async function AdminPage() {
         <Link
           href="/"
           className="text-sm"
-          style={{ color: "#f97316", marginTop: 4, display: "inline-block" }}
+          style={{ color: "#B96A2D", marginTop: 4, display: "inline-block" }}
         >
           ← Back to Dashboard
         </Link>

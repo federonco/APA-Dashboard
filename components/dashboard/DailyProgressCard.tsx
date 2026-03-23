@@ -11,6 +11,17 @@ import {
   Tooltip,
 } from "recharts";
 import type { ActiveDotProps } from "recharts";
+import { ChartLegend } from "./ChartLegend";
+import { CustomTooltip } from "./CustomTooltip";
+import { tokens } from "@/lib/designTokens";
+import { MANROPE_STACK } from "@/lib/fonts";
+import type { HourlyPipeProgress, HourlyBackfillProgress } from "@/lib/queries/daily";
+import {
+  CHART_GLOW_LINE_NAME,
+  chartLineVisual,
+  chartSeriesDot,
+  chartTargetDot,
+} from "@/lib/chartVisual";
 
 type ActiveLine = "pipes" | "pipeTarget" | "backfill" | "backfillTarget" | null;
 
@@ -24,23 +35,18 @@ function createActiveDot(lineKey: ActiveLine, onActive: (k: ActiveLine) => void)
       <circle
         cx={props.cx}
         cy={props.cy}
-        r={5}
-        fill={props.stroke}
-        stroke="#999"
-        strokeWidth={1.5}
+        r={chartLineVisual.activeDotRadius}
+        fill={chartLineVisual.dotFill}
+        stroke={props.stroke}
+        strokeWidth={chartLineVisual.dotStrokeWidth}
       />
     );
   };
 }
-import { ChartLegend } from "./ChartLegend";
-import { CustomTooltip } from "./CustomTooltip";
-import type { HourlyPipeProgress, HourlyBackfillProgress } from "@/lib/queries/daily";
 
 const PIPE_TARGET = 18;
 const BACKFILL_TARGET = 80;
 const HOURS = ["07", "08", "09", "10", "11", "12", "13", "14", "15", "16", "17"];
-const PIPE_COLOR = "#f97316";
-const BACKFILL_COLOR = "#38bdf8";
 
 type DailyProgressCardProps = {
   pipeData: HourlyPipeProgress[];
@@ -83,27 +89,24 @@ export function DailyProgressCard({
   const pipesActual = last?.pipes ?? 0;
   const metresActual = last?.backfill ?? 0;
 
-  const actualDotProps = { r: 3 };
-  const targetDotProps = { r: 2 };
-  const inactiveOpacity = 0.5;
-  const targetLineOpacity = 0.55;
+  const inactiveOpacity = chartLineVisual.inactiveDim;
   const activeDotPipes = useMemo(() => createActiveDot("pipes", setActiveLine), []);
   const activeDotPipeTarget = useMemo(() => createActiveDot("pipeTarget", setActiveLine), []);
   const activeDotBackfill = useMemo(() => createActiveDot("backfill", setActiveLine), []);
   const activeDotBackfillTarget = useMemo(() => createActiveDot("backfillTarget", setActiveLine), []);
 
   return (
-    <div className="flex h-full min-h-0 flex-col rounded-lg border border-[#1e1e1e] border-t-4 border-t-[#f97316] bg-[#0e0e0e]">
+    <div className="flex h-full min-h-0 flex-col rounded-lg border border-[#1e1e1e] border-t-4 border-t-[#C9783A] bg-[#0e0e0e]">
       <div className="flex min-h-0 flex-1 flex-col p-5">
         <div className="mb-3 flex flex-shrink-0 items-start justify-between">
           <span
-            className="font-barlow font-medium text-[#999]"
-            style={{ fontSize: "13px", letterSpacing: "0.02em" }}
+            className="font-medium text-[#999]"
+            style={{ fontSize: tokens.typography.subtitle, letterSpacing: "0.02em" }}
           >
-            DAILY PROGRESS — CUMULATIVE
+            Daily progress — cumulative
           </span>
           <span
-            className="rounded bg-[#1e1e1e] px-2 py-1 font-mono font-semibold text-white"
+            className="rounded bg-[#1e1e1e] px-2 py-1 font-semibold tabular-nums text-white"
             style={{ fontSize: "16px", lineHeight: "1.2" }}
           >
             {pipesActual} pipes / {metresActual} m
@@ -124,13 +127,13 @@ export function DailyProgressCard({
               <Tooltip content={<CustomTooltip />} cursor={{ stroke: "#1e1e1e", strokeWidth: 1 }} />
               <XAxis
                 dataKey="shortHour"
-                tick={{ fill: "#999", fontSize: 11, fontFamily: "var(--font-dm-mono), ui-monospace, monospace", fontWeight: 400 }}
+                tick={{ fill: "#999", fontSize: 11, fontFamily: MANROPE_STACK, fontWeight: 400 }}
                 axisLine={{ stroke: "#1e1e1e" }}
                 tickLine={false}
               />
               <YAxis
                 yAxisId="left"
-                tick={{ fill: "#999", fontSize: 11, fontFamily: "var(--font-dm-mono), ui-monospace, monospace", fontWeight: 400 }}
+                tick={{ fill: "#999", fontSize: 11, fontFamily: MANROPE_STACK, fontWeight: 400 }}
                 axisLine={false}
                 tickLine={false}
                 width={28}
@@ -138,56 +141,108 @@ export function DailyProgressCard({
               <YAxis
                 yAxisId="right"
                 orientation="right"
-                tick={{ fill: "#999", fontSize: 11, fontFamily: "var(--font-dm-mono), ui-monospace, monospace", fontWeight: 400 }}
+                tick={{ fill: "#999", fontSize: 11, fontFamily: MANROPE_STACK, fontWeight: 400 }}
                 axisLine={false}
                 tickLine={false}
                 width={28}
               />
-              <Line
-                yAxisId="left"
-                type="monotone"
-                dataKey="pipes"
-                stroke={PIPE_COLOR}
-                strokeWidth={activeLine === "pipes" ? 3 : 2.5}
-                strokeOpacity={activeLine && activeLine !== "pipes" ? inactiveOpacity : 1}
-                dot={{ fill: PIPE_COLOR, ...actualDotProps }}
-                activeDot={activeDotPipes}
-                name="Pipe Laid"
-              />
+              <>
+                <Line
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="pipes"
+                  stroke={tokens.charts.pipeLaid}
+                  strokeWidth={chartLineVisual.glowStrokeWidth}
+                  strokeOpacity={
+                    !activeLine || activeLine === "pipes"
+                      ? chartLineVisual.glowStrokeOpacity
+                      : inactiveOpacity * chartLineVisual.glowStrokeOpacity
+                  }
+                  dot={false}
+                  activeDot={false}
+                  name={CHART_GLOW_LINE_NAME}
+                  legendType="none"
+                />
+                <Line
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="pipes"
+                  stroke={tokens.charts.pipeLaid}
+                  strokeWidth={chartLineVisual.strokeWidth}
+                  strokeOpacity={
+                    !activeLine || activeLine === "pipes"
+                      ? chartLineVisual.strokeOpacity
+                      : inactiveOpacity * chartLineVisual.strokeOpacity
+                  }
+                  dot={chartSeriesDot(tokens.charts.pipeLaid)}
+                  activeDot={activeDotPipes}
+                  name="Pipe laid"
+                />
+              </>
               <Line
                 yAxisId="left"
                 type="monotone"
                 dataKey="pipeTarget"
-                stroke={PIPE_COLOR}
-                strokeWidth={activeLine === "pipeTarget" ? 1.25 : 1}
-                strokeOpacity={activeLine && activeLine !== "pipeTarget" ? inactiveOpacity * targetLineOpacity : targetLineOpacity}
+                stroke={tokens.charts.pipeTarget}
+                strokeWidth={chartLineVisual.targetStrokeWidth}
+                strokeOpacity={
+                  !activeLine || activeLine === "pipeTarget"
+                    ? chartLineVisual.targetStrokeOpacity
+                    : inactiveOpacity * chartLineVisual.targetStrokeOpacity
+                }
                 strokeDasharray="4 4"
-                dot={{ fill: PIPE_COLOR, ...targetDotProps }}
+                dot={chartTargetDot(tokens.charts.pipeTarget)}
                 activeDot={activeDotPipeTarget}
                 name="Pipe Target"
               />
-              <Line
-                yAxisId="right"
-                type="monotone"
-                dataKey="backfill"
-                stroke={BACKFILL_COLOR}
-                strokeWidth={activeLine === "backfill" ? 3 : 2.5}
-                strokeOpacity={activeLine && activeLine !== "backfill" ? inactiveOpacity : 1}
-                dot={{ fill: BACKFILL_COLOR, ...actualDotProps }}
-                activeDot={activeDotBackfill}
-                name="Backfill"
-              />
+              <>
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="backfill"
+                  stroke={tokens.charts.backfill}
+                  strokeWidth={chartLineVisual.glowStrokeWidth}
+                  strokeOpacity={
+                    !activeLine || activeLine === "backfill"
+                      ? chartLineVisual.glowStrokeOpacity
+                      : inactiveOpacity * chartLineVisual.glowStrokeOpacity
+                  }
+                  dot={false}
+                  activeDot={false}
+                  name={CHART_GLOW_LINE_NAME}
+                  legendType="none"
+                />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="backfill"
+                  stroke={tokens.charts.backfill}
+                  strokeWidth={chartLineVisual.strokeWidth}
+                  strokeOpacity={
+                    !activeLine || activeLine === "backfill"
+                      ? chartLineVisual.strokeOpacity
+                      : inactiveOpacity * chartLineVisual.strokeOpacity
+                  }
+                  dot={chartSeriesDot(tokens.charts.backfill)}
+                  activeDot={activeDotBackfill}
+                  name="Backfill"
+                />
+              </>
               <Line
                 yAxisId="right"
                 type="monotone"
                 dataKey="backfillTarget"
-                stroke={BACKFILL_COLOR}
-                strokeWidth={activeLine === "backfillTarget" ? 1.25 : 1}
-                strokeOpacity={activeLine && activeLine !== "backfillTarget" ? inactiveOpacity * targetLineOpacity : targetLineOpacity}
+                stroke={tokens.charts.backfillTarget}
+                strokeWidth={chartLineVisual.targetStrokeWidth}
+                strokeOpacity={
+                  !activeLine || activeLine === "backfillTarget"
+                    ? chartLineVisual.targetStrokeOpacity
+                    : inactiveOpacity * chartLineVisual.targetStrokeOpacity
+                }
                 strokeDasharray="4 4"
-                dot={{ fill: BACKFILL_COLOR, ...targetDotProps }}
+                dot={chartTargetDot(tokens.charts.backfillTarget)}
                 activeDot={activeDotBackfillTarget}
-                name="Backfill Target"
+                name="Backfill target"
               />
             </LineChart>
           </ResponsiveContainer>
@@ -195,10 +250,10 @@ export function DailyProgressCard({
         <div className="flex-shrink-0">
           <ChartLegend
           items={[
-            { label: "Pipe Laid", color: PIPE_COLOR },
-            { label: "Pipe Target", color: PIPE_COLOR, dashed: true },
-            { label: "Backfill", color: BACKFILL_COLOR },
-            { label: "Backfill Target", color: BACKFILL_COLOR, dashed: true },
+            { label: "Pipe laid", color: tokens.charts.pipeLaid },
+            { label: "Pipe target", color: tokens.charts.pipeTarget, dashed: true },
+            { label: "Backfill", color: tokens.charts.backfill },
+            { label: "Backfill target", color: tokens.charts.backfillTarget, dashed: true },
           ]}
         />
         </div>

@@ -11,14 +11,25 @@ import {
   Tooltip,
 } from "recharts";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { tokens } from "@/lib/designTokens";
 import { ChartLegend } from "./ChartLegend";
 import { CustomTooltip } from "./CustomTooltip";
 import type { MonthlyDayValue } from "@/lib/queries/daily";
 import { PIPE_LENGTH_M } from "@/lib/constants";
-
-const PIPE_COLOR = "#f97316";
-const BACKFILL_COLOR = "#38bdf8";
+import { MANROPE_STACK } from "@/lib/fonts";
+import {
+  CHART_GLOW_LINE_NAME,
+  chartLineVisual,
+  chartSeriesActiveDot,
+  chartSeriesDot,
+} from "@/lib/chartVisual";
 
 type Props = {
   data: MonthlyDayValue[];
@@ -47,8 +58,8 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
 
   const legendItems = useMemo(
     () => [
-      { label: "PIPE LAID", color: PIPE_COLOR, active: visible.pipe, onClick: toggle("pipe") },
-      { label: "BACKFILL", color: BACKFILL_COLOR, active: visible.backfill, onClick: toggle("backfill") },
+      { label: "Pipe laid", color: tokens.charts.pipeLaid, active: visible.pipe, onClick: toggle("pipe") },
+      { label: "Backfill", color: tokens.charts.backfill, active: visible.backfill, onClick: toggle("backfill") },
     ],
     [visible]
   );
@@ -56,22 +67,22 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
     return (
       <Card
         style={{
-          background: "#FCFBFB",
-          border: "1px solid #E8E6EB",
-          borderRadius: "0.75rem",
-          padding: "1.25rem",
+          background: tokens.theme.card,
+          border: `1px solid ${tokens.theme.border}`,
+          borderRadius: tokens.radius.card,
+          padding: tokens.spacing.cardPadding,
         }}
       >
         <CardHeader style={{ padding: 0, marginBottom: 12 }}>
           <span
             style={{
-              fontSize: "0.875rem",
+              fontSize: tokens.typography.subtitle,
               fontWeight: 500,
-              color: "#71717a",
+              color: tokens.text.secondary,
               letterSpacing: "0.02em",
             }}
           >
-            DAILY PROGRESS — {viewMode === "historic" ? "HISTORIC (6M)" : "CURRENT MONTH"}
+            Daily progress — {viewMode === "historic" ? "historic (6 months)" : "current month"}
           </span>
         </CardHeader>
         <CardContent style={{ padding: 0 }}>
@@ -100,10 +111,10 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
     <Card
       className="h-full flex flex-col"
       style={{
-        background: "#FCFBFB",
-        border: "1px solid #E8E6EB",
-        borderRadius: "0.75rem",
-        padding: "1.25rem",
+        background: tokens.theme.card,
+        border: `1px solid ${tokens.theme.border}`,
+        borderRadius: tokens.radius.card,
+        padding: tokens.spacing.cardPadding,
       }}
     >
       <CardHeader
@@ -120,24 +131,31 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
         <div className="flex items-center gap-2">
           <span
             style={{
-              fontSize: "0.875rem",
+              fontSize: tokens.typography.subtitle,
               fontWeight: 500,
-              color: "#71717a",
+              color: tokens.text.secondary,
               letterSpacing: "0.02em",
             }}
           >
-            DAILY PROGRESS — {viewMode === "historic" ? "HISTORIC (6M)" : "CURRENT MONTH"}
+            Daily progress — {viewMode === "historic" ? "historic (6 months)" : "current month"}
           </span>
           {historicData.length > 0 && (
-            <select
+            <Select
               value={viewMode}
-              onChange={(e) => setViewMode(e.target.value as "current" | "historic")}
-              className="rounded border px-2 py-1 text-xs"
-              style={{ borderColor: "#E8E6EB", color: "#3f3f46" }}
+              onValueChange={(v) => setViewMode(v as "current" | "historic")}
+              items={{
+                current: "Current month",
+                historic: "Historic (6 months)",
+              }}
             >
-              <option value="current">Current month</option>
-              <option value="historic">Historic (6 months)</option>
-            </select>
+              <SelectTrigger className="h-8 min-w-[10.75rem] text-xs font-medium">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="current">Current month</SelectItem>
+                <SelectItem value="historic">Historic (6 months)</SelectItem>
+              </SelectContent>
+            </Select>
           )}
         </div>
         <div
@@ -155,7 +173,7 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
               gap: 4,
               fontSize: 11,
               color: tokens.text.secondary,
-              fontFamily: "'DM Mono', monospace",
+              fontFamily: MANROPE_STACK,
             }}
           >
             <span>Target:</span>
@@ -176,7 +194,7 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
                 borderRadius: 4,
                 border: `1px solid ${tokens.theme.border}`,
                 fontSize: 11,
-                fontFamily: "'DM Mono', monospace",
+                fontFamily: MANROPE_STACK,
                 textAlign: "right",
               }}
             />
@@ -184,9 +202,12 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
           </label>
         </div>
       </CardHeader>
-      <CardContent style={{ padding: 0 }}>
-        <div style={{ minHeight: 200, width: "100%" }}>
-          <ResponsiveContainer width="100%" height={220}>
+      <CardContent
+        style={{ padding: 0 }}
+        className="flex min-h-0 flex-1 flex-col"
+      >
+        <div className="w-full min-h-0 flex-1" style={{ minHeight: 220 }}>
+          <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 10 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={tokens.theme.border} vertical={false} />
               <XAxis
@@ -194,7 +215,7 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
                 tick={{
                   fill: tokens.text.muted,
                   fontSize: 10,
-                  fontFamily: "'DM Mono', monospace",
+                  fontFamily: MANROPE_STACK,
                 }}
                 axisLine={{ stroke: tokens.theme.border }}
                 tickLine={false}
@@ -203,7 +224,7 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
                 tick={{
                   fill: tokens.text.muted,
                   fontSize: 10,
-                  fontFamily: "'DM Mono', monospace",
+                  fontFamily: MANROPE_STACK,
                 }}
                 axisLine={false}
                 tickLine={false}
@@ -213,37 +234,68 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
               <Line
                 type="monotone"
                 dataKey="pipeTargetCumulative"
-                stroke="#9ca3af"
-                strokeWidth={1.5}
+                stroke={tokens.text.muted}
+                strokeWidth={chartLineVisual.targetStrokeWidth}
+                strokeOpacity={chartLineVisual.projectionStrokeOpacity}
                 strokeDasharray="4 4"
                 dot={false}
-                name={`TARGET (${pipesPerDay} pipes)`}
+                name={`Target (${pipesPerDay} pipes)`}
               />
               {visible.pipe && (
-                <Line
-                  type="monotone"
-                  dataKey="pipeMetresCumulative"
-                  stroke={PIPE_COLOR}
-                  strokeWidth={2}
-                  dot={{ fill: PIPE_COLOR, r: 3 }}
-                  name="PIPE LAID"
-                />
+                <>
+                  <Line
+                    type="monotone"
+                    dataKey="pipeMetresCumulative"
+                    stroke={tokens.charts.pipeLaid}
+                    strokeWidth={chartLineVisual.glowStrokeWidth}
+                    strokeOpacity={chartLineVisual.glowStrokeOpacity}
+                    dot={false}
+                    activeDot={false}
+                    name={CHART_GLOW_LINE_NAME}
+                    legendType="none"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="pipeMetresCumulative"
+                    stroke={tokens.charts.pipeLaid}
+                    strokeWidth={chartLineVisual.strokeWidth}
+                    strokeOpacity={chartLineVisual.strokeOpacity}
+                    dot={chartSeriesDot(tokens.charts.pipeLaid)}
+                    activeDot={chartSeriesActiveDot(tokens.charts.pipeLaid)}
+                    name="Pipe laid"
+                  />
+                </>
               )}
               {visible.backfill && (
-                <Line
-                  type="monotone"
-                  dataKey="backfillMetresCumulative"
-                  stroke={BACKFILL_COLOR}
-                  strokeWidth={2}
-                  dot={{ fill: BACKFILL_COLOR, r: 3 }}
-                  name="BACKFILL"
-                />
+                <>
+                  <Line
+                    type="monotone"
+                    dataKey="backfillMetresCumulative"
+                    stroke={tokens.charts.backfill}
+                    strokeWidth={chartLineVisual.glowStrokeWidth}
+                    strokeOpacity={chartLineVisual.glowStrokeOpacity}
+                    dot={false}
+                    activeDot={false}
+                    name={CHART_GLOW_LINE_NAME}
+                    legendType="none"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="backfillMetresCumulative"
+                    stroke={tokens.charts.backfill}
+                    strokeWidth={chartLineVisual.strokeWidth}
+                    strokeOpacity={chartLineVisual.strokeOpacity}
+                    dot={chartSeriesDot(tokens.charts.backfill)}
+                    activeDot={chartSeriesActiveDot(tokens.charts.backfill)}
+                    name="Backfill"
+                  />
+                </>
               )}
             </LineChart>
           </ResponsiveContainer>
         </div>
-        <div style={{ marginTop: 12 }}>
-          <ChartLegend items={legendItems} />
+        <div className="shrink-0 pt-3">
+          <ChartLegend items={legendItems} className="pt-0" />
         </div>
       </CardContent>
     </Card>

@@ -1,6 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { tokens } from "@/lib/designTokens";
 
 interface Admin {
   id: string;
@@ -81,7 +89,7 @@ export function AdminPanel({ admins, crews, currentUserId }: Props) {
     <div className="space-y-6">
       <div
         className="overflow-hidden rounded-lg border"
-        style={{ background: "#FCFBFB", borderColor: "#E8E6EB" }}
+        style={{ background: "#FCFBFB", borderColor: tokens.theme.border }}
       >
         <div className="border-b px-5 py-3" style={{ borderColor: "#EEECEF" }}>
           <h2
@@ -93,7 +101,7 @@ export function AdminPanel({ admins, crews, currentUserId }: Props) {
         </div>
         <table className="w-full text-sm" style={{ color: "#3f3f46" }}>
           <thead>
-            <tr style={{ background: "#F7F7F7", borderBottom: "1px solid #E8E6EB" }}>
+            <tr style={{ background: "#F7F7F7", borderBottom: `1px solid ${tokens.theme.border}` }}>
               <th className="px-5 py-3 text-left font-medium" style={{ fontSize: "11px", color: "#71717a", textTransform: "uppercase" }}>
                 User ID
               </th>
@@ -114,7 +122,7 @@ export function AdminPanel({ admins, crews, currentUserId }: Props) {
           <tbody>
             {adminList.map((admin) => (
               <tr key={admin.id} className="border-b" style={{ borderColor: "#EEECEF" }}>
-                <td className="px-5 py-3 font-mono text-xs" style={{ color: "#71717a" }}>
+                <td className="px-5 py-3 text-xs tabular-nums" style={{ color: "#71717a" }}>
                   {admin.user_id.slice(0, 8)}...
                 </td>
                 <td className="px-5 py-3">
@@ -134,7 +142,7 @@ export function AdminPanel({ admins, crews, currentUserId }: Props) {
                     className="rounded px-2 py-0.5 text-xs"
                     style={
                       admin.role === "superadmin"
-                        ? { background: "#fff7ed", color: "#ea580c" }
+                        ? { background: "#FBF5EF", color: "#B96A2D" }
                         : { background: "#F3F4F6", color: "#6B7280" }
                     }
                   >
@@ -168,7 +176,7 @@ export function AdminPanel({ admins, crews, currentUserId }: Props) {
 
       <div
         className="rounded-lg border p-5"
-        style={{ background: "#FCFBFB", borderColor: "#E8E6EB" }}
+        style={{ background: "#FCFBFB", borderColor: tokens.theme.border }}
       >
         <h2
           className="mb-4 font-medium uppercase tracking-wide"
@@ -204,40 +212,47 @@ export function AdminPanel({ admins, crews, currentUserId }: Props) {
             <label className="mb-1 block uppercase tracking-wide" style={{ fontSize: "11px", color: "#71717a" }}>
               Crew
             </label>
-            <select
-              value={selectedCrew}
-              onChange={(e) => setSelectedCrew(e.target.value)}
-              className="rounded border px-3 py-2 text-sm"
-              style={{ borderColor: "#E2E0E6", color: "#3f3f46", minWidth: 120 }}
+            <Select
+              value={selectedCrew === "" ? null : selectedCrew}
+              onValueChange={(v) => setSelectedCrew(v ?? "")}
             >
-              <option value="">Select...</option>
-              {crews.map((c) => (
-                <option key={c.id} value={c.id}>
-                  Crew {c.name} ({c.zone})
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="min-w-[10rem]">
+                <SelectValue placeholder="Select..." />
+              </SelectTrigger>
+              <SelectContent>
+                {crews.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    Crew {c.name} ({c.zone})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <label className="mb-1 block uppercase tracking-wide" style={{ fontSize: "11px", color: "#71717a" }}>
               Role
             </label>
-            <select
+            <Select
               value={selectedRole}
-              onChange={(e) => setSelectedRole(e.target.value as "admin" | "superadmin")}
-              className="rounded border px-3 py-2 text-sm"
-              style={{ borderColor: "#E2E0E6", color: "#3f3f46", minWidth: 120 }}
+              onValueChange={(v) =>
+                setSelectedRole(v as "admin" | "superadmin")
+              }
             >
-              <option value="admin">admin</option>
-              <option value="superadmin">superadmin</option>
-            </select>
+              <SelectTrigger className="min-w-[10rem]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="admin">admin</SelectItem>
+                <SelectItem value="superadmin">superadmin</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <button
             type="button"
             onClick={handleCreate}
             disabled={loading || !email || !selectedCrew}
             className="rounded px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
-            style={{ background: "#f97316" }}
+            style={{ background: "#B96A2D" }}
           >
             {loading ? "..." : "Add"}
           </button>

@@ -96,6 +96,7 @@ function dayToLabel(d: string): string {
 
 export async function getCrewId(crewName: string): Promise<string | null> {
   const supabase = createAdminClient();
+  if (!supabase) return null;
   const { data } = await supabase
     .from("crews")
     .select("id")
@@ -106,6 +107,7 @@ export async function getCrewId(crewName: string): Promise<string | null> {
 
 export async function getSectionIdsForCrew(crewId: string): Promise<string[]> {
   const supabase = createAdminClient();
+  if (!supabase) return [];
   const { data } = await supabase
     .from("drainer_sections")
     .select("id")
@@ -133,6 +135,7 @@ export async function getSectionsForCrew(crewId: string | null): Promise<Section
   if (!hasSupabaseEnv() || !crewId) return [];
   try {
     const supabase = createAdminClient();
+    if (!supabase) return [];
     const { data, error } = await supabase
       .from("drainer_sections")
       .select("id, name, start_ch, end_ch, direction")
@@ -157,6 +160,7 @@ export async function getSectionChainageProgress(
   if (!hasSupabaseEnv()) return null;
   try {
     const supabase = createAdminClient();
+    if (!supabase) return null;
     const [{ data: section }, { data: pipes }] = await Promise.all([
       supabase
         .from("drainer_sections")
@@ -243,7 +247,12 @@ const MOCK_DAY_VALUES: DayValue[] = [
 ];
 
 function hasSupabaseEnv(): boolean {
-  return !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const service =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SECRET_SUPABASE_SERVICE_ROLE_KEY;
+  /* Dashboard server queries use the admin client; anon alone would crash createClient */
+  return !!(url && anon && service);
 }
 
 // --- 1. PIPES TODAY (drainer_pipe_records, date_installed, section_id → crew) ---
@@ -256,6 +265,9 @@ export async function fetchPipesToday(
   }
   try {
     const supabase = createAdminClient();
+    if (!supabase) {
+      return { data: { count: 22, meters: 22 * PIPE_LENGTH_M }, isMock: true };
+    }
     const targetDate = getTargetDate(date);
     let sectionIds: string[] = [];
     if (crewId) sectionIds = await getSectionIdsForCrew(crewId);
@@ -286,6 +298,9 @@ export async function fetchBackfillToday(
   }
   try {
     const supabase = createAdminClient();
+    if (!supabase) {
+      return { data: { meters: 80 }, isMock: true };
+    }
     const targetDate = getTargetDate(date);
     const { start, end } = dayStartEndPerth(targetDate);
 
@@ -328,6 +343,9 @@ export async function fetchWaterToday(
   }
   try {
     const supabase = createAdminClient();
+    if (!supabase) {
+      return { data: { totalKL: 28 }, isMock: true };
+    }
     const { start, end } = dayStartEndPerth(date);
 
     let query = supabase
@@ -362,6 +380,9 @@ export async function fetchWaterByTask(
   }
   try {
     const supabase = createAdminClient();
+    if (!supabase) {
+      return { data: MOCK_WATER_BY_TASK, isMock: true };
+    }
     const { start, end } = dayStartEndPerth(date);
 
     let query = supabase
@@ -397,6 +418,7 @@ export async function getLast5DaysPipes(
   if (!hasSupabaseEnv()) return MOCK_DAY_VALUES;
   try {
     const supabase = createAdminClient();
+    if (!supabase) return MOCK_DAY_VALUES;
     const days = getLastNWorkingDays(5);
     const start = days[0];
     const end = days[days.length - 1];
@@ -433,6 +455,7 @@ export async function getLast5DaysBackfill(
   if (!hasSupabaseEnv()) return MOCK_DAY_VALUES.map((d) => ({ ...d, value: 80 }));
   try {
     const supabase = createAdminClient();
+    if (!supabase) return MOCK_DAY_VALUES.map((d) => ({ ...d, value: 80 }));
     const days = getLastNWorkingDays(5);
     const { start: startTs } = dayStartEndPerth(days[0]);
     const { end: endTs } = dayStartEndPerth(days[days.length - 1]);
@@ -502,6 +525,7 @@ export async function getActiveVehicleCount(
   if (!hasSupabaseEnv()) return "";
   try {
     const supabase = createAdminClient();
+    if (!supabase) return "";
     const { start, end } = dayStartEndPerth(date);
 
     // 1) Get all active vehicles (by id)
@@ -574,6 +598,16 @@ export async function getCurrentMonthDailyProgress(
 
   try {
     const supabase = createAdminClient();
+    if (!supabase) {
+      return workingDays.map((d, i) => ({
+        date: d,
+        label: dayToLabel(d),
+        pipeMetres: 20 * PIPE_LENGTH_M,
+        backfillMetres: 70,
+        pipeMetresCumulative: (i + 1) * 20 * PIPE_LENGTH_M,
+        backfillMetresCumulative: (i + 1) * 70,
+      }));
+    }
     let sectionIds: string[] = [];
     if (crewId) sectionIds = await getSectionIdsForCrew(crewId);
 
@@ -679,6 +713,16 @@ export async function getHistoricMonthlyProgress(
 
   try {
     const supabase = createAdminClient();
+    if (!supabase) {
+      return months.map((mo, i) => ({
+        date: mo.first,
+        label: mo.label,
+        pipeMetres: 400,
+        backfillMetres: 1400,
+        pipeMetresCumulative: (i + 1) * 400,
+        backfillMetresCumulative: (i + 1) * 1400,
+      }));
+    }
     let sectionIds: string[] = [];
     if (crewId) sectionIds = await getSectionIdsForCrew(crewId);
 
@@ -805,6 +849,15 @@ export async function getHistoricChainageProgressData(
 
   try {
     const supabase = createAdminClient();
+    if (!supabase) {
+      const initial = 2400;
+      return historicMonthly.map((r) => ({
+        date: r.date,
+        label: r.label,
+        pipeChainage: Math.round((initial - r.pipeMetresCumulative) * 10) / 10,
+        backfillChainage: Math.round((initial - r.backfillMetresCumulative * 0.5) * 10) / 10,
+      }));
+    }
     const maxPipe = Math.max(...historicMonthly.map((r) => r.pipeMetresCumulative));
     const initialChainage = maxPipe + 200;
     const result: ChainageProgressValue[] = [];

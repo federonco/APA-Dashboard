@@ -13,7 +13,15 @@ import {
 } from "recharts";
 import type { DayValue } from "@/lib/queries/daily";
 import { tokens } from "@/lib/designTokens";
+import { CustomTooltip } from "./CustomTooltip";
 import { TARGET_PIPE_METERS_PER_DAY } from "@/lib/constants";
+import { MANROPE_STACK } from "@/lib/fonts";
+import {
+  CHART_GLOW_LINE_NAME,
+  chartLineVisual,
+  chartSeriesActiveDot,
+  chartSeriesDot,
+} from "@/lib/chartVisual";
 
 type Props = {
   pipeData: DayValue[];
@@ -45,15 +53,14 @@ export function PipeBackfillTrendCard({
       <div className="flex items-center justify-between" style={{ marginBottom: "1rem" }}>
         <span
           style={{
-            fontFamily: "'Barlow Condensed', sans-serif",
+            fontFamily: MANROPE_STACK,
             fontSize: "0.75rem",
             fontWeight: 600,
-            textTransform: "uppercase",
-            letterSpacing: "0.1em",
+            letterSpacing: "0.02em",
             color: tokens.text.muted,
           }}
         >
-          5-Day Historic Trend — Metres / Day
+          Five-day historic trend — metres per day
         </span>
       </div>
       <div style={{ width: "100%", height: 200 }}>
@@ -70,7 +77,7 @@ export function PipeBackfillTrendCard({
               tick={{
                 fill: tokens.text.muted,
                 fontSize: 10,
-                fontFamily: "'DM Mono', monospace",
+                fontFamily: MANROPE_STACK,
               }}
               axisLine={{ stroke: tokens.theme.border }}
               tickLine={false}
@@ -79,28 +86,16 @@ export function PipeBackfillTrendCard({
               tick={{
                 fill: tokens.text.muted,
                 fontSize: 10,
-                fontFamily: "'DM Mono', monospace",
+                fontFamily: MANROPE_STACK,
               }}
               axisLine={false}
               tickLine={false}
               unit=" m"
             />
-            <Tooltip
-              contentStyle={{
-                background: "#ffffff",
-                border: "1px solid #1e293b",
-                borderRadius: "0.5rem",
-                fontFamily: "'DM Mono', monospace",
-                fontSize: "0.75rem",
-              }}
-              formatter={(value, name) => [
-                `${Number(value ?? 0).toFixed(1)} m`,
-                name === "pipes" ? "Pipe Laid" : "Backfill",
-              ]}
-            />
+            <Tooltip content={<CustomTooltip />} cursor={{ stroke: tokens.theme.border, strokeWidth: 1 }} />
             <Legend
               wrapperStyle={{
-                fontFamily: "'DM Mono', monospace",
+                fontFamily: MANROPE_STACK,
                 fontSize: "0.65rem",
               }}
               formatter={(value: string) =>
@@ -117,23 +112,49 @@ export function PipeBackfillTrendCard({
                 position: "right",
                 fill: tokens.text.muted,
                 fontSize: 9,
-                fontFamily: "'DM Mono', monospace",
+                fontFamily: MANROPE_STACK,
               }}
             />
             <Line
               type="monotone"
               dataKey="pipes"
               stroke={tokens.charts.pipeLaid}
-              strokeWidth={2}
-              dot={{ fill: tokens.charts.pipeLaid, r: 3 }}
-              name="Pipe Laid"
+              strokeWidth={chartLineVisual.glowStrokeWidth}
+              strokeOpacity={chartLineVisual.glowStrokeOpacity}
+              dot={false}
+              activeDot={false}
+              name={CHART_GLOW_LINE_NAME}
+              legendType="none"
+            />
+            <Line
+              type="monotone"
+              dataKey="pipes"
+              stroke={tokens.charts.pipeLaid}
+              strokeWidth={chartLineVisual.strokeWidth}
+              strokeOpacity={chartLineVisual.strokeOpacity}
+              dot={chartSeriesDot(tokens.charts.pipeLaid)}
+              activeDot={chartSeriesActiveDot(tokens.charts.pipeLaid)}
+              name="Pipe laid"
             />
             <Line
               type="monotone"
               dataKey="backfill"
               stroke={tokens.charts.backfill}
-              strokeWidth={2}
-              dot={{ fill: tokens.charts.backfill, r: 3 }}
+              strokeWidth={chartLineVisual.glowStrokeWidth}
+              strokeOpacity={chartLineVisual.glowStrokeOpacity}
+              dot={false}
+              activeDot={false}
+              name={CHART_GLOW_LINE_NAME}
+              legendType="none"
+            />
+            <Line
+              type="monotone"
+              dataKey="backfill"
+              stroke={tokens.charts.backfill}
+              strokeWidth={chartLineVisual.strokeWidth}
+              strokeOpacity={chartLineVisual.strokeOpacity}
+              dot={chartSeriesDot(tokens.charts.backfill)}
+              activeDot={chartSeriesActiveDot(tokens.charts.backfill)}
               name="Backfill"
             />
           </LineChart>

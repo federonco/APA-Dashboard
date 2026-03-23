@@ -48,6 +48,7 @@ export async function fetchPipeDataView(
 ): Promise<{ data: PipeDataViewRow[]; isMock: boolean }> {
   try {
     const supabase = createAdminClient();
+    if (!supabase) return { data: [], isMock: true };
     const end = endDate ? new Date(endDate + "T12:00:00") : new Date();
     const startDate = new Date(end);
     startDate.setDate(startDate.getDate() - days);
@@ -131,6 +132,7 @@ export async function fetchBackfillDataView(
 ): Promise<{ data: BackfillDataViewRow[]; isMock: boolean }> {
   try {
     const supabase = createAdminClient();
+    if (!supabase) return { data: [], isMock: true };
     const end = endDate ? new Date(endDate + "T12:00:00") : new Date();
     const startDate = new Date(end);
     startDate.setDate(startDate.getDate() - days);
@@ -218,6 +220,7 @@ export async function fetchWaterDataView(
 ): Promise<{ data: WaterDataViewRow[]; isMock: boolean }> {
   try {
     const supabase = createAdminClient();
+    if (!supabase) return { data: [], isMock: true };
     const end = endDate ? new Date(endDate + "T12:00:00") : new Date();
     const startDate = new Date(end);
     startDate.setDate(startDate.getDate() - days);

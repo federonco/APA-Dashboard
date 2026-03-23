@@ -12,14 +12,14 @@ export function UserPanel({
   return (
     <div className="space-y-6">
       <div className="rounded border border-[#1e1e1e] p-6">
-        <h2 className="font-heading text-sm uppercase tracking-wider text-zinc-400 mb-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-400 mb-4">
           Section: {access.section.name}
         </h2>
         <p className="text-zinc-500 text-sm">
           Data entry for this location. Admin mode is not available from QR
           access.
         </p>
-        <p className="font-mono text-xs text-zinc-600 mt-4">
+        <p className="text-xs text-zinc-600 mt-4">
           Token: {token.slice(0, 8)}…
         </p>
       </div>

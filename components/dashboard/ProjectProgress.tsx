@@ -52,14 +52,13 @@ export function ProjectProgress({
       <CardHeader style={{ padding: 0, marginBottom: 12 }}>
         <p
           style={{
-            fontSize: tokens.typography.label,
+            fontSize: tokens.typography.subtitle,
             fontWeight: 500,
             color: tokens.text.secondary,
-            letterSpacing: "0.04em",
-            textTransform: "uppercase",
+            letterSpacing: "0.02em",
           }}
         >
-          Project Progress
+          Project progress
         </p>
       </CardHeader>
       <CardContent style={{ padding: 0 }}>

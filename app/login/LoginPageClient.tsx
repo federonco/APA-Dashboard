@@ -61,21 +61,14 @@ function LoginForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              className="selection:bg-[#D1D5DB] selection:text-[#111827]"
               style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid #E8E6EB", fontSize: 14 }}
             />
             {error && <p style={{ color: "#dc2626", fontSize: 13 }}>{error}</p>}
             <button
               type="submit"
               disabled={loading}
-              style={{
-                padding: "10px 16px",
-                fontWeight: 600,
-                background: "#f97316",
-                color: "#fff",
-                border: "none",
-                borderRadius: 8,
-                cursor: loading ? "not-allowed" : "pointer",
-              }}
+              className="w-full cursor-pointer rounded-lg border-none bg-[#D1D5DB] px-4 py-2 text-[0.875rem] font-medium text-[#111827] transition-[color,background-color] duration-150 hover:bg-[#E5E7EB] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? "Sending..." : "Send magic link"}
             </button>
@@ -83,7 +76,7 @@ function LoginForm() {
         )}
         <Link
           href="/"
-          style={{ display: "inline-block", marginTop: 20, fontSize: 14, color: "#f97316" }}
+          className="mt-5 inline-block text-[0.875rem] font-medium text-[#111827] no-underline transition-opacity duration-150 hover:opacity-75"
         >
           Back to Dashboard
         </Link>

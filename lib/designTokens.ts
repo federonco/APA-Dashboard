@@ -13,7 +13,7 @@ const comps = raw.components as Record<string, Record<string, unknown>>;
 
 const refMap: Record<string, string> = {
   card: theme?.card ?? "#FFFFFF",
-  border: theme?.border ?? "#E5E7EB",
+  border: theme?.border ?? "#F0F1F3",
   live: status?.live ?? "#22C55E",
   progressBar: status?.progressBar ?? "#3B3B45",
 };
@@ -30,7 +30,7 @@ export const tokens = {
   theme: {
     background: theme?.background ?? "#F7F7F7",
     card: theme?.card ?? "#FFFFFF",
-    border: theme?.border ?? "#E5E7EB",
+    border: theme?.border ?? "#F0F1F3",
   },
   text: {
     primary: text?.primary ?? "#111827",
@@ -42,16 +42,16 @@ export const tokens = {
     progressBar: status?.progressBar ?? "#3B3B45",
   },
   charts: {
-    pipeLaid: charts?.pipeLaid ?? "#E46A3C",
-    backfill: charts?.backfill ?? "#4A79A8",
-    pipeTarget: charts?.pipeTarget ?? "#E46A3C",
-    backfillTarget: charts?.backfillTarget ?? "#4A79A8",
+    pipeLaid: charts?.pipeLaid ?? "#C9783A",
+    backfill: charts?.backfill ?? "#6F8798",
+    pipeTarget: charts?.pipeTarget ?? "#C9783A",
+    backfillTarget: charts?.backfillTarget ?? "#6F8798",
   },
   waterChart: {
-    pipeJointing: waterChart?.pipeJointing ?? "#3C3566",
-    dustSuppression: waterChart?.dustSuppression ?? "#5E548E",
-    testing: waterChart?.testing ?? "#B9B5D6",
-    other: waterChart?.other ?? "#D6D6DD",
+    pipeJointing: waterChart?.pipeJointing ?? "#38306A",
+    dustSuppression: waterChart?.dustSuppression ?? "#5C5192",
+    testing: waterChart?.testing ?? "#A9A2D4",
+    other: waterChart?.other ?? "#CDCAD8",
   },
   radius: {
     card: radius?.card ?? "12px",
@@ -63,12 +63,14 @@ export const tokens = {
     gap: spacing?.gap ?? "16px",
   },
   typography: {
-    fontFamily: typography?.fontFamily ?? "Inter, system-ui, sans-serif",
-    title: typography?.title ?? "22px",
-    subtitle: typography?.subtitle ?? "14px",
-    kpi: typography?.kpi ?? "28px",
-    body: typography?.body ?? "14px",
-    label: typography?.label ?? "12px",
+    fontFamily:
+      typography?.fontFamily ??
+      "var(--font-manrope), ui-sans-serif, system-ui, sans-serif",
+    title: typography?.title ?? "1.375rem",
+    subtitle: typography?.subtitle ?? "0.875rem",
+    kpi: typography?.kpi ?? "1.75rem",
+    body: typography?.body ?? "0.875rem",
+    label: typography?.label ?? "0.75rem",
   },
   components: {
     kpiCard: {

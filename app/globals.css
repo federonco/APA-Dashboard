@@ -1,5 +1,6 @@
 @import "tailwindcss";
-@import "tw-animate-css";
+/* Bare "tw-animate-css" fails: Tailwind resolves from app/ — use explicit path */
+@import "../node_modules/tw-animate-css/dist/tw-animate.css";
 @import "shadcn/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
@@ -8,7 +9,7 @@
 :root {
   --token-bg: #F7F7F7;
   --token-card: #FFFFFF;
-  --token-border: #E5E7EB;
+  --token-border: #F0F1F3;
   --token-text-primary: #111827;
   --token-text-secondary: #6B7280;
   --token-text-muted: #9CA3AF;
@@ -19,11 +20,11 @@
   --token-spacing-section: 32px;
   --token-spacing-card: 20px;
   --token-spacing-gap: 16px;
-  --token-font-title: 22px;
-  --token-font-subtitle: 14px;
-  --token-font-kpi: 28px;
-  --token-font-body: 14px;
-  --token-font-label: 12px;
+  --token-font-title: 1.375rem;
+  --token-font-subtitle: 0.875rem;
+  --token-font-kpi: 1.75rem;
+  --token-font-body: 0.875rem;
+  --token-font-label: 0.75rem;
 }
 
 :root {
@@ -50,19 +51,40 @@
 }
 
 @theme inline {
+  /* Wire semantic utilities (bg-card, border-border, text-muted-foreground, …) to dashboard tokens */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-inter), Inter, system-ui, sans-serif;
+  --color-card: var(--token-card);
+  --color-card-foreground: var(--token-text-primary);
+  --color-border: var(--token-border);
+  --color-muted: var(--token-text-muted);
+  --color-muted-foreground: var(--token-text-secondary);
+  --color-primary: var(--token-progress-bar);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: var(--token-border);
+  --color-secondary-foreground: var(--token-text-primary);
+  --color-accent: var(--token-live);
+  --color-accent-foreground: var(--token-text-primary);
+  --color-popover: var(--token-card);
+  --color-popover-foreground: var(--token-text-primary);
+  --color-destructive: var(--destructive);
+  --color-input: var(--token-border);
+  --color-ring: var(--token-border);
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --radius-xl: var(--token-radius-card);
 }
 
 @layer base {
+  html {
+    font-size: 16px;
+  }
   * {
     outline-color: var(--ring);
   }
   body {
     background: var(--token-bg);
     color: var(--token-text-primary);
-    font-family: Inter, system-ui, sans-serif;
+    font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
     font-size: var(--token-font-body);
   }
 }

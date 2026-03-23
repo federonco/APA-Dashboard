@@ -2,18 +2,25 @@
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import type { WaterByActivity } from "@/lib/queries/daily";
+import { tokens } from "@/lib/designTokens";
 import { CustomTooltip } from "./CustomTooltip";
 
-/* APA accent colors for water activities */
+/* Violet family only — same hierarchy as main water chart (no line-chart orange). */
 const COLOR_MAP: Record<string, string> = {
-  "Pipe jointing": "#f97316",
-  "Dust suppression": "#38bdf8",
-  Testing: "#4ade80",
-  Other: "#facc15",
-  default: "#0ea5e9",
+  "Pipe jointing": tokens.waterChart.pipeJointing,
+  "Dust suppression": tokens.waterChart.dustSuppression,
+  Testing: tokens.waterChart.testing,
+  Other: tokens.waterChart.other,
+  default: tokens.waterChart.dustSuppression,
 };
 
-const FALLBACK_COLORS = ["#f97316", "#38bdf8", "#4ade80", "#facc15", "#0ea5e9"];
+const FALLBACK_COLORS = [
+  tokens.waterChart.pipeJointing,
+  tokens.waterChart.dustSuppression,
+  tokens.waterChart.testing,
+  tokens.waterChart.other,
+  tokens.waterChart.dustSuppression,
+];
 
 function getColor(activity: string, index: number): string {
   return COLOR_MAP[activity] ?? FALLBACK_COLORS[index % FALLBACK_COLORS.length];
@@ -34,17 +41,17 @@ export function WaterConsumptionCard({ data }: WaterConsumptionCardProps) {
   }));
 
   return (
-    <div className="min-h-[26rem] rounded-lg border border-[#1e1e1e] border-t-4 border-t-[#0ea5e9] bg-[#0e0e0e]">
+    <div className="min-h-[26rem] rounded-lg border border-[#1e1e1e] border-t-4 border-t-[#5E7487] bg-[#0e0e0e]">
       <div className="flex h-full min-h-[26rem] flex-col p-5 py-6">
         <div className="mb-3 flex items-start justify-between">
           <span
-            className="font-barlow font-medium text-[#999]"
-            style={{ fontSize: "13px", letterSpacing: "0.02em" }}
+            className="font-medium text-[#999]"
+            style={{ fontSize: tokens.typography.subtitle, letterSpacing: "0.02em" }}
           >
-            WATER CONSUMPTION — TODAY
+            Water consumption — today
           </span>
           <span
-            className="rounded bg-[#1e1e1e] px-2 py-1 font-mono font-semibold text-white"
+            className="rounded bg-[#1e1e1e] px-2 py-1 font-semibold tabular-nums text-white"
             style={{ fontSize: "16px", lineHeight: "1.2" }}
           >
             {totalKL} kL
@@ -68,7 +75,7 @@ export function WaterConsumptionCard({ data }: WaterConsumptionCardProps) {
                   paddingAngle={2}
                   dataKey="value"
                 >
-                  {chartData.map((entry, i) => (
+                  {chartData.map((entry) => (
                     <Cell key={entry.name} fill={entry.color} />
                   ))}
                 </Pie>

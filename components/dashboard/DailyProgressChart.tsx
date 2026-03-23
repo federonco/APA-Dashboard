@@ -16,6 +16,12 @@ import { tokens } from "@/lib/designTokens";
 import { ChartLegend } from "./ChartLegend";
 import { CustomTooltip } from "./CustomTooltip";
 import type { HourlyPipeProgress, HourlyBackfillProgress } from "@/lib/queries/daily";
+import {
+  CHART_GLOW_LINE_NAME,
+  chartLineVisual,
+  chartSeriesDot,
+  chartTargetDot,
+} from "@/lib/chartVisual";
 
 type ActiveLine = "pipes" | "pipeTarget" | "backfill" | "backfillTarget" | null;
 
@@ -33,10 +39,10 @@ function createActiveDot(lineKey: ActiveLine, onActive: (k: ActiveLine) => void)
       <circle
         cx={props.cx}
         cy={props.cy}
-        r={5}
-        fill={props.stroke}
-        stroke={tokens.text.muted}
-        strokeWidth={1.5}
+        r={chartLineVisual.activeDotRadius}
+        fill={chartLineVisual.dotFill}
+        stroke={props.stroke}
+        strokeWidth={chartLineVisual.dotStrokeWidth}
       />
     );
   };
@@ -93,18 +99,15 @@ export function DailyProgressChart({
 
   const legendItems = useMemo(
     () => [
-      { label: "Pipe Laid", color: tokens.charts.pipeLaid, active: visible.pipes, onClick: toggle("pipes") },
-      { label: "Pipe Target", color: tokens.charts.pipeTarget, dashed: true, active: visible.pipeTarget, onClick: toggle("pipeTarget") },
+      { label: "Pipe laid", color: tokens.charts.pipeLaid, active: visible.pipes, onClick: toggle("pipes") },
+      { label: "Pipe target", color: tokens.charts.pipeTarget, dashed: true, active: visible.pipeTarget, onClick: toggle("pipeTarget") },
       { label: "Backfill", color: tokens.charts.backfill, active: visible.backfill, onClick: toggle("backfill") },
-      { label: "Backfill Target", color: tokens.charts.backfillTarget, dashed: true, active: visible.backfillTarget, onClick: toggle("backfillTarget") },
+      { label: "Backfill target", color: tokens.charts.backfillTarget, dashed: true, active: visible.backfillTarget, onClick: toggle("backfillTarget") },
     ],
     [visible]
   );
 
-  const actualDotProps = { r: 3 };
-  const targetDotProps = { r: 2 };
-  const inactiveOpacity = 0.5;
-  const targetLineOpacity = 0.55;
+  const inactiveOpacity = chartLineVisual.inactiveDim;
   const activeDotPipes = useMemo(() => createActiveDot("pipes", setActiveLine), []);
   const activeDotPipeTarget = useMemo(() => createActiveDot("pipeTarget", setActiveLine), []);
   const activeDotBackfill = useMemo(() => createActiveDot("backfill", setActiveLine), []);
@@ -139,7 +142,7 @@ export function DailyProgressChart({
             letterSpacing: "0.02em",
           }}
         >
-          DAILY PROGRESS — CUMULATIVE
+          Daily progress — cumulative
         </span>
         <span
           style={{
@@ -202,17 +205,39 @@ export function DailyProgressChart({
                 width={28}
               />
               {visible.pipes && (
-              <Line
-                yAxisId="left"
-                type="monotone"
-                dataKey="pipes"
-                stroke={tokens.charts.pipeLaid}
-                strokeWidth={activeLine === "pipes" ? 3 : 2.5}
-                strokeOpacity={activeLine && activeLine !== "pipes" ? inactiveOpacity : 1}
-                dot={{ fill: tokens.charts.pipeLaid, ...actualDotProps }}
-                activeDot={activeDotPipes}
-                name="Pipe Laid"
-              />
+              <>
+                <Line
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="pipes"
+                  stroke={tokens.charts.pipeLaid}
+                  strokeWidth={chartLineVisual.glowStrokeWidth}
+                  strokeOpacity={
+                    !activeLine || activeLine === "pipes"
+                      ? chartLineVisual.glowStrokeOpacity
+                      : inactiveOpacity * chartLineVisual.glowStrokeOpacity
+                  }
+                  dot={false}
+                  activeDot={false}
+                  name={CHART_GLOW_LINE_NAME}
+                  legendType="none"
+                />
+                <Line
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="pipes"
+                  stroke={tokens.charts.pipeLaid}
+                  strokeWidth={chartLineVisual.strokeWidth}
+                  strokeOpacity={
+                    !activeLine || activeLine === "pipes"
+                      ? chartLineVisual.strokeOpacity
+                      : inactiveOpacity * chartLineVisual.strokeOpacity
+                  }
+                  dot={chartSeriesDot(tokens.charts.pipeLaid)}
+                  activeDot={activeDotPipes}
+                  name="Pipe laid"
+                />
+              </>
               )}
               {visible.pipeTarget && (
               <Line
@@ -220,30 +245,52 @@ export function DailyProgressChart({
                 type="monotone"
                 dataKey="pipeTarget"
                 stroke={tokens.charts.pipeTarget}
-                strokeWidth={activeLine === "pipeTarget" ? 1.25 : 1}
+                strokeWidth={chartLineVisual.targetStrokeWidth}
                 strokeOpacity={
-                  activeLine && activeLine !== "pipeTarget"
-                    ? inactiveOpacity * targetLineOpacity
-                    : targetLineOpacity
+                  !activeLine || activeLine === "pipeTarget"
+                    ? chartLineVisual.targetStrokeOpacity
+                    : inactiveOpacity * chartLineVisual.targetStrokeOpacity
                 }
                 strokeDasharray="4 4"
-                dot={{ fill: tokens.charts.pipeTarget, ...targetDotProps }}
+                dot={chartTargetDot(tokens.charts.pipeTarget)}
                 activeDot={activeDotPipeTarget}
-                name="Pipe Target"
+                name="Pipe target"
               />
               )}
               {visible.backfill && (
-              <Line
-                yAxisId="right"
-                type="monotone"
-                dataKey="backfill"
-                stroke={tokens.charts.backfill}
-                strokeWidth={activeLine === "backfill" ? 3 : 2.5}
-                strokeOpacity={activeLine && activeLine !== "backfill" ? inactiveOpacity : 1}
-                dot={{ fill: tokens.charts.backfill, ...actualDotProps }}
-                activeDot={activeDotBackfill}
-                name="Backfill"
-              />
+              <>
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="backfill"
+                  stroke={tokens.charts.backfill}
+                  strokeWidth={chartLineVisual.glowStrokeWidth}
+                  strokeOpacity={
+                    !activeLine || activeLine === "backfill"
+                      ? chartLineVisual.glowStrokeOpacity
+                      : inactiveOpacity * chartLineVisual.glowStrokeOpacity
+                  }
+                  dot={false}
+                  activeDot={false}
+                  name={CHART_GLOW_LINE_NAME}
+                  legendType="none"
+                />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="backfill"
+                  stroke={tokens.charts.backfill}
+                  strokeWidth={chartLineVisual.strokeWidth}
+                  strokeOpacity={
+                    !activeLine || activeLine === "backfill"
+                      ? chartLineVisual.strokeOpacity
+                      : inactiveOpacity * chartLineVisual.strokeOpacity
+                  }
+                  dot={chartSeriesDot(tokens.charts.backfill)}
+                  activeDot={activeDotBackfill}
+                  name="Backfill"
+                />
+              </>
               )}
               {visible.backfillTarget && (
               <Line
@@ -251,16 +298,16 @@ export function DailyProgressChart({
                 type="monotone"
                 dataKey="backfillTarget"
                 stroke={tokens.charts.backfillTarget}
-                strokeWidth={activeLine === "backfillTarget" ? 1.25 : 1}
+                strokeWidth={chartLineVisual.targetStrokeWidth}
                 strokeOpacity={
-                  activeLine && activeLine !== "backfillTarget"
-                    ? inactiveOpacity * targetLineOpacity
-                    : targetLineOpacity
+                  !activeLine || activeLine === "backfillTarget"
+                    ? chartLineVisual.targetStrokeOpacity
+                    : inactiveOpacity * chartLineVisual.targetStrokeOpacity
                 }
                 strokeDasharray="4 4"
-                dot={{ fill: tokens.charts.backfillTarget, ...targetDotProps }}
+                dot={chartTargetDot(tokens.charts.backfillTarget)}
                 activeDot={activeDotBackfillTarget}
-                name="Backfill Target"
+                name="Backfill target"
               />
               )}
             </LineChart>

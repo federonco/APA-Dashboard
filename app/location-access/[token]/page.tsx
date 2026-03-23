@@ -15,12 +15,12 @@ export default async function LocationAccessPage({
   return (
     <div className="min-h-screen bg-[#080808]">
       <header className="border-b border-[#1e1e1e] px-6 py-4">
-        <h1 className="font-heading text-xl text-white">
+        <h1 className="text-xl font-semibold text-white">
           {access.type === "psp"
             ? `${access.location.name} — ${access.section.name}`
             : access.section.name}
         </h1>
-        <p className="font-mono text-xs text-zinc-500 uppercase tracking-wider">
+        <p className="text-xs text-zinc-500 uppercase tracking-wider">
           User Access · Read & Record
         </p>
       </header>

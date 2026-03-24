@@ -79,55 +79,69 @@ function mockSpreadsheetData(crew: string): SpreadsheetData {
   };
 }
 
+export type SpreadsheetTablesOption = "d" | "b" | "w";
+
+/** Fetch only specified tables. Use ["d"] for initial load; fetch B/W on demand. */
 export async function getSpreadsheetData(
   crew: string,
-  selectedDate?: string
+  selectedDate?: string,
+  tables: SpreadsheetTablesOption[] = ["d", "b", "w"]
 ): Promise<SpreadsheetData> {
   try {
     const crewForQueries = crew === "Global" ? "A" : crew;
     const endStr = selectedDate ?? new Date().toLocaleDateString("en-CA", { timeZone: "Australia/Perth" });
+    const crewId = tables.includes("d") || tables.includes("b") ? await getCrewId(crewForQueries) : null;
 
     const [pipeRes, backfillRes, waterRes] = await Promise.all([
-      fetchPipeDataView(7, await getCrewId(crewForQueries), endStr),
-      fetchBackfillDataView(7, await getCrewId(crewForQueries), endStr),
-      fetchWaterDataView(7, crewForQueries, endStr),
+      tables.includes("d") ? fetchPipeDataView(7, crewId, endStr) : Promise.resolve({ data: [], isMock: false }),
+      tables.includes("b") ? fetchBackfillDataView(7, crewId, endStr) : Promise.resolve({ data: [], isMock: false }),
+      tables.includes("w") ? fetchWaterDataView(7, crewForQueries, endStr) : Promise.resolve({ data: [], isMock: false }),
     ]);
 
+    const mock = mockSpreadsheetData(crew);
     const mockFlags = {
       d: pipeRes.isMock,
       b: backfillRes.isMock,
       w: waterRes.isMock,
     };
 
+    if (!tables.includes("d") && !tables.includes("b") && !tables.includes("w")) {
+      return mock;
+    }
     if (pipeRes.isMock && backfillRes.isMock && waterRes.isMock) {
-      return mockSpreadsheetData(crew);
+      return mock;
     }
 
-    const mock = mockSpreadsheetData(crew);
     return {
-      onsiteD: pipeRes.isMock ? mock.onsiteD : pipeRes.data.map((r) => ({
-        date: r.date,
-        time_lodged: r.time_lodged,
-        section: r.section,
-        pipes_laid: r.pipes_laid,
-        pipe_id: r.pipe_id,
-      })),
-      onsiteB: backfillRes.isMock ? mock.onsiteB : backfillRes.data.map((r) => ({
-        date: r.date,
-        time_lodged: r.time_lodged,
-        section: r.section,
-        backfill_m3: r.backfill_m3,
-        chainage: r.chainage,
-      })),
-      onsiteW: waterRes.isMock ? mock.onsiteW : waterRes.data.map((r) => ({
-        date: r.date,
-        time_lodged: r.time_lodged,
-        location: r.location,
-        water_litres: r.water_litres,
-        destination: r.destination,
-        truck_id: r.truck_id,
-        task: r.task,
-      })),
+      onsiteD: tables.includes("d")
+        ? (pipeRes.isMock ? mock.onsiteD : pipeRes.data.map((r) => ({
+            date: r.date,
+            time_lodged: r.time_lodged,
+            section: r.section,
+            pipes_laid: r.pipes_laid,
+            pipe_id: r.pipe_id,
+          })))
+        : [],
+      onsiteB: tables.includes("b")
+        ? (backfillRes.isMock ? mock.onsiteB : backfillRes.data.map((r) => ({
+            date: r.date,
+            time_lodged: r.time_lodged,
+            section: r.section,
+            backfill_m3: r.backfill_m3,
+            chainage: r.chainage,
+          })))
+        : [],
+      onsiteW: tables.includes("w")
+        ? (waterRes.isMock ? mock.onsiteW : waterRes.data.map((r) => ({
+            date: r.date,
+            time_lodged: r.time_lodged,
+            location: r.location,
+            water_litres: r.water_litres,
+            destination: r.destination,
+            truck_id: r.truck_id,
+            task: r.task,
+          })))
+        : [],
       mockFlags,
     };
   } catch (err) {

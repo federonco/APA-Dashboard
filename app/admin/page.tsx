@@ -21,27 +21,10 @@ async function getSessionUser(): Promise<{ id: string; email: string | null } | 
   return { id: user.id, email: user.email ?? null };
 }
 
-// Uses psp_admins (schema table). Match by user_id or email when user_id is null.
-async function isAdmin(userId: string, userEmail: string | null): Promise<boolean> {
-  const admin = createAdminClient();
-  if (!admin) return false;
-  const { data: byUserId } = await admin
-    .from("psp_admins")
-    .select("id")
-    .eq("user_id", userId)
-    .limit(1)
-    .maybeSingle();
-  if (byUserId) return true;
-  if (userEmail) {
-    const { data: byEmail } = await admin
-      .from("psp_admins")
-      .select("id")
-      .eq("email", userEmail)
-      .limit(1)
-      .maybeSingle();
-    if (byEmail) return true;
-  }
-  return false;
+// Uses super_admins table. Only super admins can access /admin.
+async function canAccessAdmin(userId: string, userEmail: string | null): Promise<boolean> {
+  const { isSuperAdmin } = await import("@/lib/auth");
+  return isSuperAdmin(userId, userEmail);
 }
 
 async function fetchAdminList(crews: CrewWithZone[]): Promise<AdminWithCrew[]> {
@@ -76,7 +59,7 @@ async function fetchCrews(): Promise<CrewWithZone[]> {
 export default async function AdminPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login?redirect=/admin");
-  if (!(await isAdmin(user.id, user.email))) redirect("/");
+  if (!(await canAccessAdmin(user.id, user.email))) redirect("/");
 
   const crews = await fetchCrews();
   const admins = await fetchAdminList(crews);

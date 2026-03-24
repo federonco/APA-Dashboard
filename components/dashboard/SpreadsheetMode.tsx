@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
-import type { SpreadsheetData } from "@/lib/queries/spreadsheet";
+import { useRef, useState, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import type { SpreadsheetData, OnSiteBRow, OnSiteWRow } from "@/lib/queries/spreadsheet";
 import {
   Select,
   SelectContent,
@@ -15,6 +16,8 @@ import {
   type PeriodFilter,
 } from "@/lib/utils/spreadsheetFormat";
 
+const TABLE_MAX_H = 320;
+
 type SpreadsheetModeProps = {
   data: SpreadsheetData;
   crew: string;
@@ -22,16 +25,72 @@ type SpreadsheetModeProps = {
 };
 
 export function SpreadsheetMode({ data, crew, referenceDate }: SpreadsheetModeProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const dRef = useRef<HTMLDivElement>(null);
   const bRef = useRef<HTMLDivElement>(null);
   const wRef = useRef<HTMLDivElement>(null);
 
-  const [period, setPeriod] = useState<PeriodFilter>("day");
+  const period = (searchParams.get("period") as PeriodFilter) ?? "day";
+
+  const setPeriod = useCallback(
+    (v: PeriodFilter) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("period", v);
+      router.push(`/?${params.toString()}`);
+    },
+    [router, searchParams]
+  );
+  const [expandedD, setExpandedD] = useState(true);
+  const [expandedB, setExpandedB] = useState(false);
+  const [expandedW, setExpandedW] = useState(false);
+  const [onsiteB, setOnsiteB] = useState<OnSiteBRow[]>(data.onsiteB);
+  const [onsiteW, setOnsiteW] = useState<OnSiteWRow[]>(data.onsiteW);
+  const [loadingB, setLoadingB] = useState(false);
+  const [loadingW, setLoadingW] = useState(false);
+  const [mockB, setMockB] = useState(data.mockFlags?.b ?? false);
+  const [mockW, setMockW] = useState(data.mockFlags?.w ?? false);
+  const hasFetchedB = useRef(false);
+  const hasFetchedW = useRef(false);
+
+  const fetchB = useCallback(async () => {
+    if (loadingB || hasFetchedB.current) return;
+    hasFetchedB.current = true;
+    setLoadingB(true);
+    try {
+      const date = referenceDate ?? new Date().toLocaleDateString("en-CA", { timeZone: "Australia/Perth" });
+      const res = await fetch(`/api/spreadsheet/backfill?crew=${encodeURIComponent(crew)}&date=${encodeURIComponent(date)}`);
+      const json = await res.json();
+      setOnsiteB(json.onsiteB ?? []);
+      setMockB(json.isMock ?? false);
+    } catch {
+      setOnsiteB([]);
+    } finally {
+      setLoadingB(false);
+    }
+  }, [crew, referenceDate, loadingB]);
+
+  const fetchW = useCallback(async () => {
+    if (loadingW || hasFetchedW.current) return;
+    hasFetchedW.current = true;
+    setLoadingW(true);
+    try {
+      const date = referenceDate ?? new Date().toLocaleDateString("en-CA", { timeZone: "Australia/Perth" });
+      const res = await fetch(`/api/spreadsheet/water?crew=${encodeURIComponent(crew)}&date=${encodeURIComponent(date)}`);
+      const json = await res.json();
+      setOnsiteW(json.onsiteW ?? []);
+      setMockW(json.isMock ?? false);
+    } catch {
+      setOnsiteW([]);
+    } finally {
+      setLoadingW(false);
+    }
+  }, [crew, referenceDate, loadingW]);
 
   const filtered = {
     onsiteD: filterByPeriod(data.onsiteD, period, referenceDate),
-    onsiteB: filterByPeriod(data.onsiteB, period, referenceDate),
-    onsiteW: filterByPeriod(data.onsiteW, period, referenceDate),
+    onsiteB: filterByPeriod(onsiteB, period, referenceDate),
+    onsiteW: filterByPeriod(onsiteW, period, referenceDate),
   };
 
   const crewLabel = crew === "Global" ? "All Crews" : `Crew ${crew}`;
@@ -102,9 +161,12 @@ export function SpreadsheetMode({ data, crew, referenceDate }: SpreadsheetModePr
         </div>
       </div>
       <section className="space-y-4">
-        {/* OnSite-D only: outer card #EEE4DA; header row #E8D2BF; B/W unchanged */}
         <div className="rounded-xl border border-[#DDD2C8] bg-[#EEE4DA] p-5">
-          <div className="mb-4 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => setExpandedD((p) => !p)}
+            className="mb-4 flex w-full items-center justify-between text-left"
+          >
             <h2 className={sectionTitleStyles}>
               OnSite-D (pipes)
               {data.mockFlags?.d && (
@@ -113,10 +175,15 @@ export function SpreadsheetMode({ data, crew, referenceDate }: SpreadsheetModePr
                 </span>
               )}
             </h2>
-          </div>
+            <span className="text-[18px] text-zinc-500" aria-hidden>
+              {expandedD ? "▼" : "▶"}
+            </span>
+          </button>
+          {expandedD && (
           <div
             ref={dRef}
-            className="overflow-x-auto rounded-lg border border-[#E3D4C6] bg-[#F3E8DC]"
+            className="overflow-auto rounded-lg border border-[#E3D4C6] bg-[#F3E8DC]"
+            style={{ maxHeight: TABLE_MAX_H }}
           >
             <table className="w-full min-w-[400px] table-fixed">
               <thead>
@@ -184,24 +251,41 @@ export function SpreadsheetMode({ data, crew, referenceDate }: SpreadsheetModePr
               </tbody>
             </table>
           </div>
+          )}
         </div>
       </section>
 
       <section className="space-y-4">
         <div className="rounded-xl border border-[#D3DEE7] bg-[#E6EDF3] p-5">
-          <div className="mb-4 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => {
+              setExpandedB((p) => !p);
+              if (!expandedB) fetchB();
+            }}
+            className="mb-4 flex w-full items-center justify-between text-left"
+          >
             <h2 className={sectionTitleStyles}>
               OnSite-B (backfill)
-              {data.mockFlags?.b && (
+              {mockB && (
                 <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800">
                   mock data
                 </span>
               )}
             </h2>
-          </div>
+            <span className="text-[18px] text-zinc-500" aria-hidden>
+              {expandedB ? "▼" : "▶"}
+            </span>
+          </button>
+          {expandedB && (loadingB ? (
+            <div className="py-8 text-center text-[13px] text-zinc-500">
+              Loading...
+            </div>
+          ) : (
           <div
             ref={bRef}
-            className="overflow-x-auto rounded-lg border border-[#BFCFDD] bg-[#D1DEE9]"
+            className="overflow-auto rounded-lg border border-[#BFCFDD] bg-[#D1DEE9]"
+            style={{ maxHeight: TABLE_MAX_H }}
           >
             <table className="w-full min-w-[400px] table-fixed">
               <thead>
@@ -269,24 +353,41 @@ export function SpreadsheetMode({ data, crew, referenceDate }: SpreadsheetModePr
               </tbody>
             </table>
           </div>
+          ))}
         </div>
       </section>
 
       <section className="space-y-4">
         <div className="rounded-xl border border-[#D6D0E2] bg-[#E6E2EE] p-5">
-          <div className="mb-4 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => {
+              setExpandedW((p) => !p);
+              if (!expandedW) fetchW();
+            }}
+            className="mb-4 flex w-full items-center justify-between text-left"
+          >
             <h2 className={sectionTitleStyles}>
               OnSite-W (water)
-              {data.mockFlags?.w && (
+              {mockW && (
                 <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800">
                   mock data
                 </span>
               )}
             </h2>
-          </div>
+            <span className="text-[18px] text-zinc-500" aria-hidden>
+              {expandedW ? "▼" : "▶"}
+            </span>
+          </button>
+          {expandedW && (loadingW ? (
+            <div className="py-8 text-center text-[13px] text-zinc-500">
+              Loading...
+            </div>
+          ) : (
           <div
             ref={wRef}
-            className="overflow-x-auto rounded-lg border border-[#C8BEDB] bg-[#DDD6EB]"
+            className="overflow-auto rounded-lg border border-[#C8BEDB] bg-[#DDD6EB]"
+            style={{ maxHeight: TABLE_MAX_H }}
           >
             <table className="w-full min-w-[400px] table-fixed">
               <thead>
@@ -358,6 +459,7 @@ export function SpreadsheetMode({ data, crew, referenceDate }: SpreadsheetModePr
               </tbody>
             </table>
           </div>
+          ))}
         </div>
       </section>
     </div>

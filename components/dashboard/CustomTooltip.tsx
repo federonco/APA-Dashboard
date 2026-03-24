@@ -12,7 +12,9 @@ export function CustomTooltip({ active, payload, label }: Partial<TooltipContent
   const filtered = payload.filter(
     (e) =>
       !["aheadValue", "behindValue"].includes(String(e.dataKey ?? "")) &&
-      !String(e.dataKey ?? "").startsWith("seg")
+      !String(e.dataKey ?? "").startsWith("seg") &&
+      e.dataKey !== CHART_GLOW_LINE_NAME &&
+      e.name !== CHART_GLOW_LINE_NAME
   );
   if (!filtered.length) return null;
 

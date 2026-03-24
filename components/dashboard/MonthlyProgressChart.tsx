@@ -36,22 +36,59 @@ type Props = {
   historicData?: MonthlyDayValue[];
 };
 
+function weekOfMonth(dateStr: string): number {
+  const d = parseInt(dateStr.slice(8, 10), 10);
+  return Math.ceil(d / 7);
+}
+
+function aggregateByWeek(days: MonthlyDayValue[]): MonthlyDayValue[] {
+  const byWeek = new Map<number, { pipe: number; backfill: number }>();
+  for (const d of days) {
+    const w = weekOfMonth(d.date);
+    const cur = byWeek.get(w) ?? { pipe: 0, backfill: 0 };
+    byWeek.set(w, {
+      pipe: cur.pipe + d.pipeMetres,
+      backfill: cur.backfill + d.backfillMetres,
+    });
+  }
+  let pipeCum = 0;
+  let backfillCum = 0;
+  return Array.from({ length: 4 }, (_, i) => i + 1).map((w) => {
+    const v = byWeek.get(w) ?? { pipe: 0, backfill: 0 };
+    pipeCum += v.pipe;
+    backfillCum += v.backfill;
+    return {
+      date: `W${w}`,
+      label: `Week ${w}`,
+      pipeMetres: v.pipe,
+      backfillMetres: v.backfill,
+      pipeMetresCumulative: pipeCum,
+      backfillMetresCumulative: backfillCum,
+    };
+  });
+}
+
 export function MonthlyProgressChart({ data, historicData = [] }: Props) {
-  const [viewMode, setViewMode] = useState<"current" | "historic">("current");
+  const [viewMode, setViewMode] = useState<"current" | "weeks">("current");
   const [pipesPerDay, setPipesPerDay] = useState<number>(1);
   const [visible, setVisible] = useState({ pipe: true, backfill: true });
 
-  const baseData = viewMode === "historic" && historicData.length > 0 ? historicData : data;
+  const baseData =
+    viewMode === "weeks" && data.length > 0 ? aggregateByWeek(data) : data;
   const chartData = useMemo(
     () => {
+      const isWeekly = viewMode === "weeks" && baseData.length <= 5;
       const targetPerDayMeters = pipesPerDay * PIPE_LENGTH_M;
+      const targetPerPoint = isWeekly
+        ? targetPerDayMeters * 5
+        : targetPerDayMeters;
       return baseData.map((d, index) => ({
         ...d,
-        pipeTargetCumulative: targetPerDayMeters * (index + 1),
+        pipeTargetCumulative: targetPerPoint * (index + 1),
         pipePipesPerDay: d.pipeMetres / PIPE_LENGTH_M,
       }));
     },
-    [baseData, pipesPerDay]
+    [baseData, pipesPerDay, viewMode]
   );
   const toggle = (key: keyof typeof visible) => () =>
     setVisible((v) => ({ ...v, [key]: !v[key] }));
@@ -82,7 +119,7 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
               letterSpacing: "0.02em",
             }}
           >
-            Daily progress — {viewMode === "historic" ? "historic (6 months)" : "current month"}
+            Daily progress — {viewMode === "weeks" ? "weeks of the month" : "current month"}
           </span>
         </CardHeader>
         <CardContent style={{ padding: 0 }}>
@@ -137,15 +174,15 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
               letterSpacing: "0.02em",
             }}
           >
-            Daily progress — {viewMode === "historic" ? "historic (6 months)" : "current month"}
+            Daily progress — {viewMode === "weeks" ? "weeks of the month" : "current month"}
           </span>
-          {historicData.length > 0 && (
+          {data.length > 0 && (
             <Select
               value={viewMode}
-              onValueChange={(v) => setViewMode(v as "current" | "historic")}
+              onValueChange={(v) => setViewMode(v as "current" | "weeks")}
               items={{
                 current: "Current month",
-                historic: "Historic (6 months)",
+                weeks: "Weeks of the month",
               }}
             >
               <SelectTrigger className="h-8 min-w-[10.75rem] text-xs font-medium">
@@ -153,7 +190,7 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="current">Current month</SelectItem>
-                <SelectItem value="historic">Historic (6 months)</SelectItem>
+                <SelectItem value="weeks">Weeks of the month</SelectItem>
               </SelectContent>
             </Select>
           )}

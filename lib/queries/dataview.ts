@@ -231,7 +231,7 @@ export async function fetchWaterDataView(
 
     let query = supabase
       .from("wc_water_logs")
-      .select("id, created_at, volume_liters, vehicle_id, destination_id, crew_id, task_id, wc_tasks(name)")
+      .select("id, created_at, volume_liters, vehicle_id, origin_site, destination_id, crew_id, task_id, wc_tasks(name)")
       .gte("created_at", startISO)
       .lte("created_at", endISO)
       .order("created_at", { ascending: true });
@@ -247,7 +247,7 @@ export async function fetchWaterDataView(
 
     let dests: { id: string; name?: string }[] = [];
     if (destIds.length > 0) {
-      const r = await supabase.from("locations").select("id, name").in("id", destIds);
+      const r = await supabase.from("wc_destination_sites").select("id, name").in("id", destIds);
       dests = r.data ?? [];
     }
 

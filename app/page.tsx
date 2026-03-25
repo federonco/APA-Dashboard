@@ -13,8 +13,6 @@ import {
   getSectionChainageProgress,
 } from "@/lib/queries/daily";
 import { getSpreadsheetData } from "@/lib/queries/spreadsheet";
-import { createClient } from "@/lib/supabase/server";
-import { isSuperAdmin } from "@/lib/auth";
 import { Header } from "@/components/dashboard/Header";
 import { NavTabs } from "@/components/dashboard/NavTabs";
 import { KPISummary } from "@/components/dashboard/KPISummary";
@@ -49,10 +47,6 @@ export default async function Page({ searchParams }: Props) {
   const crewForQueries = crew === "Global" ? "A" : crew;
   const isCrewEnabled = CREW_TABS.find((t) => t.name === crew)?.enabled ?? false;
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  const superAdmin = user ? await isSuperAdmin(user.id, user.email ?? null) : false;
-
   // Data View: only fetch OnSite-D (pipes); B/W load on expand
   if (view === "spreadsheet" && isCrewEnabled) {
     const spreadsheetData = await getSpreadsheetData(crew, selectedDate, ["d"]);
@@ -61,7 +55,7 @@ export default async function Page({ searchParams }: Props) {
         className="flex min-h-screen flex-col"
         style={{ background: tokens.theme.background }}
       >
-        <Header crew={crew} isSuperAdmin={superAdmin} />
+        <Header crew={crew} />
         <NavTabs crew={crew} view={view} />
         <main className="flex-1" style={{ padding: tokens.spacing.section }}>
           <DaySelector currentDate={rawDate} />
@@ -109,7 +103,7 @@ export default async function Page({ searchParams }: Props) {
       className="flex min-h-screen flex-col"
       style={{ background: tokens.theme.background }}
     >
-      <Header crew={crew} isSuperAdmin={superAdmin} />
+      <Header crew={crew} />
       <NavTabs crew={crew} view={view} />
 
       <main

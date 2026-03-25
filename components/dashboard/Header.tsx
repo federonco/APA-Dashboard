@@ -7,10 +7,9 @@ import { tokens } from "@/lib/designTokens";
 
 interface Props {
   crew: string;
-  isSuperAdmin?: boolean;
 }
 
-export function Header({ crew, isSuperAdmin = false }: Props) {
+export function Header({ crew }: Props) {
   const searchParams = useSearchParams();
   const view = searchParams.get("view") ?? "dashboard";
   const isSpreadsheet = view === "spreadsheet";
@@ -75,14 +74,12 @@ export function Header({ crew, isSuperAdmin = false }: Props) {
           >
             {today}
           </span>
-          {isSuperAdmin && (
-            <Link
-              href="/admin"
-              className="inline-block rounded-lg px-4 py-2 no-underline transition-[color,background-color] duration-150 text-[0.875rem] font-medium bg-[#D1D5DB] text-[#111827] hover:bg-[#E5E7EB]"
-            >
-              Admin
-            </Link>
-          )}
+          <Link
+            href="/admin"
+            className="inline-block rounded-lg px-4 py-2 no-underline transition-[color,background-color] duration-150 text-[0.875rem] font-medium bg-[#D1D5DB] text-[#111827] hover:bg-[#E5E7EB]"
+          >
+            Admin
+          </Link>
           <Link
             href={toggleUrl}
             prefetch={true}

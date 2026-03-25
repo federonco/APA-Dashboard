@@ -13,8 +13,7 @@ import { tokens } from "@/lib/designTokens";
 interface Admin {
   id: string;
   user_id: string;
-  role: string;
-  created_at: string;
+  email: string;
   crews: { id: string; name: string; zone: string } | null;
 }
 
@@ -33,21 +32,23 @@ interface Props {
 export function AdminPanel({ admins, crews, currentUserId }: Props) {
   const [adminList, setAdminList] = useState(admins);
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [selectedCrew, setSelectedCrew] = useState("");
-  const [selectedRole, setSelectedRole] = useState<"admin" | "superadmin">("admin");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [createdCreds, setCreatedCreds] = useState<{ email: string; password: string } | null>(null);
 
   const handleCreate = async () => {
-    if (!email || !selectedCrew) return;
+    if (!email || !selectedCrew || !password) return;
     setLoading(true);
     setError("");
+    setCreatedCreds(null);
 
     try {
       const res = await fetch("/api/admin/admins", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, crew_id: selectedCrew, role: selectedRole }),
+        body: JSON.stringify({ email, password, crew_id: selectedCrew }),
       });
       const data = await res.json();
 
@@ -56,7 +57,19 @@ export function AdminPanel({ admins, crews, currentUserId }: Props) {
         return;
       }
 
-      window.location.reload();
+      setCreatedCreds({ email: String(email).trim(), password });
+      setEmail("");
+      setPassword("");
+      setSelectedCrew("");
+
+      // Refresh list without full reload
+      const listRes = await fetch("/api/admin/admins", { method: "GET" });
+      if (listRes.ok) {
+        const rows = await listRes.json();
+        setAdminList(rows);
+      } else {
+        window.location.reload();
+      }
     } catch {
       setError("Network error");
     } finally {
@@ -103,16 +116,10 @@ export function AdminPanel({ admins, crews, currentUserId }: Props) {
           <thead>
             <tr style={{ background: "#F7F7F7", borderBottom: `1px solid ${tokens.theme.border}` }}>
               <th className="px-5 py-3 text-left font-medium" style={{ fontSize: "11px", color: "#71717a", textTransform: "uppercase" }}>
-                User ID
+                Email
               </th>
               <th className="px-5 py-3 text-left font-medium" style={{ fontSize: "11px", color: "#71717a", textTransform: "uppercase" }}>
                 Crew
-              </th>
-              <th className="px-5 py-3 text-left font-medium" style={{ fontSize: "11px", color: "#71717a", textTransform: "uppercase" }}>
-                Role
-              </th>
-              <th className="px-5 py-3 text-left font-medium" style={{ fontSize: "11px", color: "#71717a", textTransform: "uppercase" }}>
-                Added
               </th>
               <th className="px-5 py-3 text-right font-medium" style={{ fontSize: "11px", color: "#71717a", textTransform: "uppercase" }}>
                 Action
@@ -122,8 +129,8 @@ export function AdminPanel({ admins, crews, currentUserId }: Props) {
           <tbody>
             {adminList.map((admin) => (
               <tr key={admin.id} className="border-b" style={{ borderColor: "#EEECEF" }}>
-                <td className="px-5 py-3 text-xs tabular-nums" style={{ color: "#71717a" }}>
-                  {admin.user_id.slice(0, 8)}...
+                <td className="px-5 py-3 text-xs" style={{ color: "#71717a" }}>
+                  {admin.email || "—"}
                 </td>
                 <td className="px-5 py-3">
                   {admin.crews ? (
@@ -136,21 +143,6 @@ export function AdminPanel({ admins, crews, currentUserId }: Props) {
                   ) : (
                     "—"
                   )}
-                </td>
-                <td className="px-5 py-3">
-                  <span
-                    className="rounded px-2 py-0.5 text-xs"
-                    style={
-                      admin.role === "superadmin"
-                        ? { background: "#FBF5EF", color: "#B96A2D" }
-                        : { background: "#F3F4F6", color: "#6B7280" }
-                    }
-                  >
-                    {admin.role}
-                  </span>
-                </td>
-                <td className="px-5 py-3 text-xs" style={{ color: "#9CA3AF" }}>
-                  {new Date(admin.created_at).toLocaleDateString("en-AU")}
                 </td>
                 <td className="px-5 py-3 text-right">
                   <button
@@ -210,6 +202,19 @@ export function AdminPanel({ admins, crews, currentUserId }: Props) {
           </div>
           <div>
             <label className="mb-1 block uppercase tracking-wide" style={{ fontSize: "11px", color: "#71717a" }}>
+              Password
+            </label>
+            <input
+              type="text"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Set an initial password"
+              className="rounded border px-3 py-2 text-sm"
+              style={{ borderColor: "#E2E0E6", color: "#3f3f46", minWidth: 220 }}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block uppercase tracking-wide" style={{ fontSize: "11px", color: "#71717a" }}>
               Crew
             </label>
             <Select
@@ -228,29 +233,25 @@ export function AdminPanel({ admins, crews, currentUserId }: Props) {
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <label className="mb-1 block uppercase tracking-wide" style={{ fontSize: "11px", color: "#71717a" }}>
-              Role
-            </label>
-            <Select
-              value={selectedRole}
-              onValueChange={(v) =>
-                setSelectedRole(v as "admin" | "superadmin")
-              }
+          {createdCreds && (
+            <a
+              className="rounded px-4 py-2 text-sm font-medium"
+              style={{
+                border: "1px solid #E2E0E6",
+                color: "#111827",
+                background: "#F9FAFB",
+              }}
+              href={`mailto:${encodeURIComponent(createdCreds.email)}?subject=${encodeURIComponent("APA Dashboard admin access")}&body=${encodeURIComponent(
+                `Hi,\n\nAn admin account has been created for you on the APA Dashboard.\n\nLogin: ${window.location.origin}/login\nEmail: ${createdCreds.email}\nPassword: ${createdCreds.password}\n\nPlease change your password after logging in.\n`
+              )}`}
             >
-              <SelectTrigger className="min-w-[10rem]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="admin">admin</SelectItem>
-                <SelectItem value="superadmin">superadmin</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+              Email credentials
+            </a>
+          )}
           <button
             type="button"
             onClick={handleCreate}
-            disabled={loading || !email || !selectedCrew}
+            disabled={loading || !email || !password || !selectedCrew}
             className="rounded px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
             style={{ background: "#B96A2D" }}
           >

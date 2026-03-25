@@ -7,7 +7,7 @@ import { AdminPanel } from "@/components/dashboard/AdminPanel";
 export type AdminWithCrew = {
   id: string;
   user_id: string;
-  role: string;
+  email: string;
   created_at: string;
   crews: { id: string; name: string; zone: string } | null;
 };
@@ -41,7 +41,7 @@ async function fetchAdminList(crews: CrewWithZone[]): Promise<AdminWithCrew[]> {
     return {
       id: a.id,
       user_id: a.user_id ?? "",
-      role: "admin",
+      email: a.email ?? "",
       created_at: "",
       crews: crew ?? null,
     };

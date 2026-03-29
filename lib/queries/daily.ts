@@ -350,10 +350,16 @@ export async function fetchWaterToday(
 
     let query = supabase
       .from("wc_water_logs")
-      .select("volume_liters, crew")
+      .select("volume_liters")
       .gte("created_at", start)
       .lte("created_at", end);
-    if (crewCode) query = query.eq("crew", crewCode);
+    if (crewCode) {
+      const crewId = await getCrewId(crewCode);
+      if (!crewId) {
+        return { data: { totalKL: 0 }, isMock: false };
+      }
+      query = query.eq("crew_id", crewId);
+    }
 
     const { data: rows, error } = await query;
     if (error) throw error;
@@ -387,10 +393,16 @@ export async function fetchWaterByTask(
 
     let query = supabase
       .from("wc_water_logs")
-      .select("volume_liters, task_id, wc_tasks(name), crew")
+      .select("volume_liters, task_id, wc_tasks(name)")
       .gte("created_at", start)
       .lte("created_at", end);
-    if (crewCode) query = query.eq("crew", crewCode);
+    if (crewCode) {
+      const crewId = await getCrewId(crewCode);
+      if (!crewId) {
+        return { data: [], isMock: false };
+      }
+      query = query.eq("crew_id", crewId);
+    }
 
     const { data: rows, error } = await query;
     if (error) throw error;
@@ -531,8 +543,8 @@ export async function getActiveVehicleCount(
     // 1) Get all active vehicles (by id)
     const { data: vehicles, error: vehiclesError } = await supabase
       .from("wc_vehicles")
-      .select("id, name, active")
-      .eq("active", true);
+      .select("id, name, is_active")
+      .eq("is_active", true);
     if (vehiclesError) throw vehiclesError;
 
     const vehicleIds = Array.from(
@@ -558,7 +570,11 @@ export async function getActiveVehicleCount(
       .gte("created_at", start)
       .lte("created_at", end)
       .in("vehicle_id", vehicleIds);
-    if (crewCode) logsQuery = logsQuery.eq("crew", crewCode);
+    if (crewCode) {
+      const crewId = await getCrewId(crewCode);
+      if (!crewId) return "";
+      logsQuery = logsQuery.eq("crew_id", crewId);
+    }
 
     const { data: logs, error: logsError } = await logsQuery;
     if (logsError) throw logsError;

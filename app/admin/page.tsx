@@ -21,7 +21,7 @@ async function getSessionUser(): Promise<{ id: string; email: string | null } | 
   return { id: user.id, email: user.email ?? null };
 }
 
-// Uses super_admins table. Only super admins can access /admin.
+// Uses user_app_roles table. Only super_admins can access /admin.
 async function canAccessAdmin(userId: string, userEmail: string | null): Promise<boolean> {
   const { isSuperAdmin } = await import("@/lib/auth");
   return isSuperAdmin(userId, userEmail);
@@ -30,18 +30,35 @@ async function canAccessAdmin(userId: string, userEmail: string | null): Promise
 async function fetchAdminList(crews: CrewWithZone[]): Promise<AdminWithCrew[]> {
   const admin = createAdminClient();
   if (!admin) return [];
-  const { data: admins, error } = await admin
-    .from("psp_admins")
-    .select("id, user_id, email, crew_id");
+  const { data: roleRows, error } = await admin
+    .from("user_app_roles")
+    .select("id, user_id, crew_id")
+    .eq("role", "admin");
   if (error) return [];
-  if (!admins?.length) return [];
+  if (!roleRows?.length) return [];
+  type RoleRow = { id: string; user_id: string | null; crew_id?: string | null };
+  const typed = roleRows as RoleRow[];
+  const userIds = typed.map((r) => r.user_id).filter((id): id is string => !!id);
+  const emailMap = new Map<string, string>();
+  if (userIds.length > 0) {
+    const { data: profiles } = await admin
+      .from("user_profiles")
+      .select("auth_user_id, email")
+      .in("auth_user_id", [...new Set(userIds)]);
+    for (const p of profiles ?? []) {
+      const uid = (p as { auth_user_id?: string }).auth_user_id;
+      const em = (p as { email?: string | null }).email;
+      if (uid) emailMap.set(uid, em?.trim() ?? "");
+    }
+  }
   const crewMap = new Map(crews.map((c) => [c.id, c]));
-  return (admins as Array<{ id: string; user_id: string | null; email?: string | null; crew_id?: string | null }>).map((a) => {
+  return typed.map((a) => {
     const crew = a.crew_id ? crewMap.get(a.crew_id) : null;
+    const uid = a.user_id ?? "";
     return {
       id: a.id,
-      user_id: a.user_id ?? "",
-      email: a.email ?? "",
+      user_id: uid,
+      email: uid ? emailMap.get(uid) ?? "" : "",
       created_at: "",
       crews: crew ?? null,
     };

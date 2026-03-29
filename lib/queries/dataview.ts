@@ -2,7 +2,7 @@
  * Data View queries — real Supabase data for OnSite-D/B/W tables.
  */
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getSectionIdsForCrew } from "@/lib/queries/daily";
+import { getCrewId, getSectionIdsForCrew } from "@/lib/queries/daily";
 
 function toPerthDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-CA", { timeZone: "Australia/Perth" });
@@ -236,7 +236,13 @@ export async function fetchWaterDataView(
       .lte("created_at", endISO)
       .order("created_at", { ascending: true });
 
-    if (crewCode) query = query.eq("crew", crewCode);
+    if (crewCode) {
+      const crewId = await getCrewId(crewCode);
+      if (!crewId) {
+        return { data: [], isMock: false };
+      }
+      query = query.eq("crew_id", crewId);
+    }
 
     const { data: rows, error } = await query;
     if (error) throw error;

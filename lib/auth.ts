@@ -2,7 +2,6 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type CrewInfo = {
-
   id: string;
   name: string;
   zone: string;
@@ -23,51 +22,37 @@ export async function getAdminCrew(): Promise<CrewInfo | null> {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  let { data: admin } = await supabase
-    .from("psp_admins")
+  const { data: roleRows, error: roleErr } = await supabase
+    .from("user_app_roles")
     .select("crew_id")
     .eq("user_id", user.id)
-    .maybeSingle();
+    .not("crew_id", "is", null)
+    .order("crew_id", { ascending: true })
+    .limit(1);
 
-  if (!admin && user.email) {
-    const r = await supabase
-      .from("psp_admins")
-      .select("crew_id")
-      .eq("email", user.email)
-      .maybeSingle();
-    admin = r.data;
-  }
-
-  if (!admin?.crew_id) return null;
+  if (roleErr) return null;
+  const crewId = roleRows?.[0]?.crew_id;
+  if (!crewId) return null;
 
   const { data: crew } = await supabase
     .from("crews")
     .select("id, name, zone")
-    .eq("id", admin.crew_id)
+    .eq("id", crewId)
     .single();
 
   return crew ? { id: crew.id, name: crew.name, zone: crew.zone } : null;
 }
 
-/** Check if user is super admin (access to /admin). Uses super_admins table. */
+/** Check if user is super admin (access to /admin). Uses user_app_roles with role super_admin. */
 export async function isSuperAdmin(userId: string, email: string | null): Promise<boolean> {
   const admin = createAdminClient();
   if (!admin) return false;
-  const { data: byUserId } = await admin
-    .from("super_admins")
+  const { data } = await admin
+    .from("user_app_roles")
     .select("id")
     .eq("user_id", userId)
+    .eq("role", "super_admin")
     .limit(1)
     .maybeSingle();
-  if (byUserId) return true;
-  if (email) {
-    const { data: byEmail } = await admin
-      .from("super_admins")
-      .select("id")
-      .eq("email", email)
-      .limit(1)
-      .maybeSingle();
-    if (byEmail) return true;
-  }
-  return false;
+  return !!data;
 }

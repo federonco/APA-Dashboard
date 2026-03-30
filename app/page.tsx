@@ -19,7 +19,7 @@ import { KPISummary } from "@/components/dashboard/KPISummary";
 import { SectionProgress } from "@/components/dashboard/SectionProgress";
 import { MonthlyProgressChart } from "@/components/dashboard/MonthlyProgressChart";
 import { WaterConsumptionChart } from "@/components/dashboard/WaterConsumptionChart";
-import { ChainageProgressChart } from "@/components/dashboard/ChainageProgressChart";
+import { PlannerGanttCard } from "@/components/dashboard/PlannerGanttCard";
 import { DaySelector } from "@/components/dashboard/DaySelector";
 import { tokens } from "@/lib/designTokens";
 import { toWorkingDay } from "@/lib/utils/workingDays";
@@ -76,8 +76,6 @@ export default async function Page({ searchParams }: Props) {
     activeVehicleCount,
     currentMonthProgress,
     historicProgress,
-    chainageProgressData,
-    historicChainageProgressData,
   ] = await Promise.all([
     fetchPipesToday(crewId ?? undefined, selectedDate),
     fetchBackfillToday(crewId ?? undefined, selectedDate),
@@ -86,8 +84,6 @@ export default async function Page({ searchParams }: Props) {
     getActiveVehicleCount(crewForQueries, selectedDate),
     getCurrentMonthDailyProgress(crewId ?? undefined),
     getHistoricMonthlyProgress(crewId ?? undefined),
-    getChainageProgressData(crewId ?? undefined),
-    getHistoricChainageProgressData(crewId ?? undefined),
   ]);
 
   const sections = crewId ? await getSectionsForCrew(crewId) : [];
@@ -146,7 +142,7 @@ export default async function Page({ searchParams }: Props) {
                 <WaterConsumptionChart data={waterByActivity} activeVehicles={activeVehicleCount} />
               </div>
             </div>
-            <ChainageProgressChart data={chainageProgressData} historicData={historicChainageProgressData} />
+            <PlannerGanttCard crewId={crewId} />
           </>
         )}
       </main>

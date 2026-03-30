@@ -19,7 +19,7 @@ export type PipeDataViewRow = {
   date: string;
   time_lodged?: string;
   section: string;
-  pipes_laid: number;
+  joint_type: string;
   pipe_id: string;
 };
 
@@ -60,7 +60,7 @@ export async function fetchPipeDataView(
 
     let query = supabase
       .from("drainer_pipe_records")
-      .select("id, pipe_fitting_id, date_installed, time_installed, section_id, lodged_at")
+      .select("id, pipe_fitting_id, joint_type, date_installed, time_installed, section_id, lodged_at")
       .gte("date_installed", startStr)
       .lte("date_installed", endStr)
       .not("date_installed", "is", null)
@@ -108,12 +108,14 @@ export async function fetchPipeDataView(
       const sectionName = secInfo?.name ?? sid ?? "—";
       const fittingId = (r as { pipe_fitting_id?: string }).pipe_fitting_id;
       const id = fittingId && fittingId.trim().length > 0 ? fittingId : String((r as { id: string }).id);
+      const jointTypeRaw = (r as { joint_type?: string | null }).joint_type;
+      const jointType = jointTypeRaw && jointTypeRaw.trim().length > 0 ? jointTypeRaw : "—";
 
       return {
         date,
         time_lodged: timeLodged,
         section: sectionName,
-        pipes_laid: 1,
+        joint_type: jointType,
         pipe_id: id,
       };
     });
@@ -241,7 +243,20 @@ export async function fetchWaterDataView(
       if (!crewId) {
         return { data: [], isMock: false };
       }
-      query = query.eq("crew_id", crewId);
+      const { data: vehicles } = await supabase
+        .from("wc_vehicles")
+        .select("id")
+        .eq("crew_id", crewId);
+      const vehicleIds = (vehicles ?? [])
+        .map((v) => (v as { id?: string | null }).id)
+        .filter((id): id is string => !!id);
+      if (vehicleIds.length > 0) {
+        query = query.or(
+          `crew_id.eq.${crewId},and(crew_id.is.null,vehicle_id.in.(${vehicleIds.join(",")}))`
+        );
+      } else {
+        query = query.eq("crew_id", crewId);
+      }
     }
 
     const { data: rows, error } = await query;

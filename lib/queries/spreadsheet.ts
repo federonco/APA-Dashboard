@@ -9,7 +9,7 @@ export type OnSiteDRow = {
   date: string;
   time_lodged?: string;
   section: string;
-  pipes_laid: number;
+  joint_type: string;
   joint_count?: number;
   pipe_id?: string;
 };
@@ -55,7 +55,7 @@ function mockSpreadsheetData(crew: string): SpreadsheetData {
       date,
       time_lodged: `${9 + (i % 3)}:${i % 2 === 0 ? "15" : "45"}`,
       section: `Section ${i + 1}`,
-      pipes_laid: 18 + (i % 5),
+      joint_type: "RRJ",
       joint_count: 18 + (i % 5),
       pipe_id: undefined,
     })),
@@ -118,7 +118,7 @@ export async function getSpreadsheetData(
             date: r.date,
             time_lodged: r.time_lodged,
             section: r.section,
-            pipes_laid: r.pipes_laid,
+            joint_type: r.joint_type,
             pipe_id: r.pipe_id,
           })))
         : [],

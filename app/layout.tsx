@@ -11,6 +11,9 @@ const manrope = Manrope({
 export const metadata: Metadata = {
   title: "Alkimos Pipeline Alliance - DN1600 Trunk Main",
   description: "Engineering dashboard for Water Corp DN1600 MSCL pipeline",
+  icons: {
+    icon: "/x.png",
+  },
 };
 
 export default function RootLayout({

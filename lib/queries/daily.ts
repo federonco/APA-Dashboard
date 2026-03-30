@@ -105,6 +105,19 @@ export async function getCrewId(crewName: string): Promise<string | null> {
   return data?.id ?? null;
 }
 
+async function getVehicleIdsForCrew(crewId: string): Promise<string[]> {
+  const supabase = createAdminClient();
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("wc_vehicles")
+    .select("id")
+    .eq("crew_id", crewId);
+  if (error) return [];
+  return (data ?? [])
+    .map((r) => (r as { id?: string | null }).id)
+    .filter((id): id is string => !!id);
+}
+
 export async function getSectionIdsForCrew(crewId: string): Promise<string[]> {
   const supabase = createAdminClient();
   if (!supabase) return [];
@@ -358,7 +371,14 @@ export async function fetchWaterToday(
       if (!crewId) {
         return { data: { totalKL: 0 }, isMock: false };
       }
-      query = query.eq("crew_id", crewId);
+      const vehicleIds = await getVehicleIdsForCrew(crewId);
+      if (vehicleIds.length > 0) {
+        query = query.or(
+          `crew_id.eq.${crewId},and(crew_id.is.null,vehicle_id.in.(${vehicleIds.join(",")}))`
+        );
+      } else {
+        query = query.eq("crew_id", crewId);
+      }
     }
 
     const { data: rows, error } = await query;
@@ -401,7 +421,14 @@ export async function fetchWaterByTask(
       if (!crewId) {
         return { data: [], isMock: false };
       }
-      query = query.eq("crew_id", crewId);
+      const vehicleIds = await getVehicleIdsForCrew(crewId);
+      if (vehicleIds.length > 0) {
+        query = query.or(
+          `crew_id.eq.${crewId},and(crew_id.is.null,vehicle_id.in.(${vehicleIds.join(",")}))`
+        );
+      } else {
+        query = query.eq("crew_id", crewId);
+      }
     }
 
     const { data: rows, error } = await query;
@@ -573,7 +600,10 @@ export async function getActiveVehicleCount(
     if (crewCode) {
       const crewId = await getCrewId(crewCode);
       if (!crewId) return "";
-      logsQuery = logsQuery.eq("crew_id", crewId);
+      // Include legacy/unassigned rows where crew_id is null but vehicle belongs to crew
+      logsQuery = logsQuery.or(
+        `crew_id.eq.${crewId},crew_id.is.null`
+      );
     }
 
     const { data: logs, error: logsError } = await logsQuery;

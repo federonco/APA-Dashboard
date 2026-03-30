@@ -198,7 +198,7 @@ export function SpreadsheetMode({ data, crew, referenceDate }: SpreadsheetModePr
                     Section
                   </th>
                   <th className="w-1/5 px-4 py-2 text-left text-[13px] font-medium text-[#4A3F38]">
-                    Pipes laid
+                    Joint type
                   </th>
                   <th className="w-1/5 rounded-tr-lg px-4 py-2 text-left text-[13px] font-medium text-[#4A3F38]">
                     Pipe ID
@@ -236,8 +236,8 @@ export function SpreadsheetMode({ data, crew, referenceDate }: SpreadsheetModePr
                         <td className="bg-[#E8D2BF] px-4 py-2 text-[13px] text-[#3F362F]">
                           {row.section}
                         </td>
-                        <td className="bg-[#E8D2BF] px-4 py-2 text-left text-[13px] tabular-nums text-[#3F362F]">
-                          {row.pipes_laid}
+                        <td className="bg-[#E8D2BF] px-4 py-2 text-left text-[13px] text-[#3F362F]">
+                          {row.joint_type}
                         </td>
                         <td
                           className={`bg-[#E8D2BF] px-4 py-2 text-[13px] text-[#3F362F]${isLast ? " rounded-br-lg" : ""}`}

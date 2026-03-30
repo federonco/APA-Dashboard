@@ -7,8 +7,6 @@ import {
   fetchWaterToday,
   getCurrentMonthDailyProgress,
   getHistoricMonthlyProgress,
-  getChainageProgressData,
-  getHistoricChainageProgressData,
   getSectionsForCrew,
   getSectionChainageProgress,
 } from "@/lib/queries/daily";
@@ -142,7 +140,7 @@ export default async function Page({ searchParams }: Props) {
                 <WaterConsumptionChart data={waterByActivity} activeVehicles={activeVehicleCount} />
               </div>
             </div>
-            <PlannerGanttCard crewId={crewId} />
+            <PlannerGanttCard />
           </>
         )}
       </main>

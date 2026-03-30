@@ -142,6 +142,7 @@ export type SectionProgressData = {
   finalChainage: number;
   percent: number;
   pipeCount: number;
+  avgPipesPerDay: number;
 };
 
 export async function getSectionsForCrew(crewId: string | null): Promise<SectionInfo[]> {
@@ -182,7 +183,7 @@ export async function getSectionChainageProgress(
         .maybeSingle(),
       supabase
         .from("drainer_pipe_records")
-        .select("chainage")
+        .select("chainage, date_installed")
         .eq("section_id", sectionId)
         .not("chainage", "is", null),
     ]);
@@ -208,12 +209,20 @@ export async function getSectionChainageProgress(
       ? startCh - minCh
       : maxCh - startCh;
     const percent = Math.min(100, Math.round((metresCovered / totalLength) * 100));
+    const workedDays = new Set(
+      (pipes ?? [])
+        .map((p) => (p as { date_installed?: string | null }).date_installed)
+        .filter((d): d is string => !!d)
+    ).size;
+    const avgPipesPerDay =
+      workedDays > 0 ? Math.round((pipes.length / workedDays) * 10) / 10 : 0;
     return {
       sectionId,
       installedChainage: Math.round(installedChainage * 10) / 10,
       finalChainage,
       percent,
       pipeCount: pipes.length,
+      avgPipesPerDay,
     };
   } catch (err) {
     console.error("[Dashboard] getSectionChainageProgress failed:", err);
@@ -567,12 +576,28 @@ export async function getActiveVehicleCount(
     if (!supabase) return "";
     const { start, end } = dayStartEndPerth(date);
 
-    // 1) Get all active vehicles (by id)
-    const { data: vehicles, error: vehiclesError } = await supabase
-      .from("wc_vehicles")
-      .select("id, name, is_active")
-      .eq("is_active", true);
-    if (vehiclesError) throw vehiclesError;
+    // 1) Get all active vehicles (by id). Support both schemas:
+    // - new: wc_vehicles.is_active
+    // - legacy: wc_vehicles.active
+    let vehicles: Array<{ id?: string | null; name?: string | null }> | null = null;
+    {
+      const { data, error } = await supabase
+        .from("wc_vehicles")
+        .select("id, name, is_active")
+        .eq("is_active", true);
+      if (!error) {
+        vehicles = data as Array<{ id?: string | null; name?: string | null }>;
+      } else if (error.code === "42703") {
+        const legacy = await supabase
+          .from("wc_vehicles")
+          .select("id, name, active")
+          .eq("active", true);
+        if (legacy.error) throw legacy.error;
+        vehicles = legacy.data as Array<{ id?: string | null; name?: string | null }>;
+      } else {
+        throw error;
+      }
+    }
 
     const vehicleIds = Array.from(
       new Set(

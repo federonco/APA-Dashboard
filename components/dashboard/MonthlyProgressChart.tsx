@@ -42,11 +42,19 @@ type LineStyle = {
   dash: string; // "" means solid
 };
 
+type TargetRange = {
+  id: string;
+  start: string;
+  end: string;
+  pipesPerDay: number;
+};
+
 type ChartEditorSettings = {
   title: string;
   pipe: LineStyle;
   backfill: LineStyle;
   target: LineStyle;
+  targetRanges?: TargetRange[];
 };
 
 const SETTINGS_KEY = "monthlyProgressChart.settings.v1";
@@ -69,6 +77,24 @@ function safeParseSettings(raw: string | null): ChartEditorSettings | null {
       pipe: v.pipe,
       backfill: v.backfill,
       target: v.target,
+      targetRanges: Array.isArray(v.targetRanges)
+        ? v.targetRanges
+            .filter(
+              (r): r is TargetRange =>
+                !!r &&
+                typeof r === "object" &&
+                typeof (r as TargetRange).id === "string" &&
+                typeof (r as TargetRange).start === "string" &&
+                typeof (r as TargetRange).end === "string" &&
+                typeof (r as TargetRange).pipesPerDay === "number"
+            )
+            .map((r) => ({
+              id: r.id,
+              start: r.start,
+              end: r.end,
+              pipesPerDay: r.pipesPerDay,
+            }))
+        : [],
     };
   } catch {
     return null;
@@ -118,6 +144,7 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
     pipe: { color: tokens.charts.pipeLaid, width: chartLineVisual.strokeWidth, dash: "" },
     backfill: { color: tokens.charts.backfill, width: chartLineVisual.strokeWidth, dash: "" },
     target: { color: tokens.text.muted, width: chartLineVisual.targetStrokeWidth, dash: "4 4" },
+    targetRanges: [],
   }));
 
   useEffect(() => {
@@ -136,23 +163,68 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
     }
   }, [settings]);
 
-  const baseData =
-    viewMode === "weeks" && data.length > 0 ? aggregateByWeek(data) : data;
-  const chartData = useMemo(
-    () => {
-      const isWeekly = viewMode === "weeks" && baseData.length <= 5;
-      const targetPerDayMeters = pipesPerDay * PIPE_LENGTH_M;
-      const targetPerPoint = isWeekly
-        ? targetPerDayMeters * 5
-        : targetPerDayMeters;
-      return baseData.map((d, index) => ({
+  const chartData = useMemo(() => {
+    // Build daily target first, then aggregate to weeks if needed.
+    let targetCum = 0;
+    const daily = data.map((d) => {
+      const rangeMatch = (settings.targetRanges ?? []).find(
+        (r) => r.start && r.end && d.date >= r.start && d.date <= r.end
+      );
+      const activeTargetPipes = rangeMatch ? rangeMatch.pipesPerDay : pipesPerDay;
+      const targetMeters = activeTargetPipes * PIPE_LENGTH_M;
+      targetCum += targetMeters;
+      return {
         ...d,
-        pipeTargetCumulative: targetPerPoint * (index + 1),
+        pipeTargetCumulative: targetCum,
         pipePipesPerDay: d.pipeMetres / PIPE_LENGTH_M,
-      }));
-    },
-    [baseData, pipesPerDay, viewMode]
-  );
+      };
+    });
+
+    if (viewMode !== "weeks" || daily.length === 0) return daily;
+
+    const byWeek = new Map<number, { pipe: number; backfill: number }>();
+    for (const d of daily) {
+      const w = weekOfMonth(d.date);
+      const cur = byWeek.get(w) ?? { pipe: 0, backfill: 0 };
+      byWeek.set(w, {
+        pipe: cur.pipe + d.pipeMetres,
+        backfill: cur.backfill + d.backfillMetres,
+      });
+    }
+
+    // Simpler and stable: weekly target = sum of daily target increments.
+    const targetByWeek = new Map<number, number>();
+    for (const d of daily) {
+      const w = weekOfMonth(d.date);
+      const prev = targetByWeek.get(w) ?? 0;
+      const rangeMatch = (settings.targetRanges ?? []).find(
+        (r) => r.start && r.end && d.date >= r.start && d.date <= r.end
+      );
+      const activeTargetPipes = rangeMatch ? rangeMatch.pipesPerDay : pipesPerDay;
+      targetByWeek.set(w, prev + activeTargetPipes * PIPE_LENGTH_M);
+    }
+
+    let pipeCum = 0;
+    let backfillCum = 0;
+    let targetWeekCum = 0;
+    return Array.from({ length: 4 }, (_, i) => i + 1).map((w) => {
+      const v = byWeek.get(w) ?? { pipe: 0, backfill: 0 };
+      const targetWeek = targetByWeek.get(w) ?? 0;
+      pipeCum += v.pipe;
+      backfillCum += v.backfill;
+      targetWeekCum += targetWeek;
+      return {
+        date: `W${w}`,
+        label: `Week ${w}`,
+        pipeMetres: v.pipe,
+        backfillMetres: v.backfill,
+        pipeMetresCumulative: pipeCum,
+        backfillMetresCumulative: backfillCum,
+        pipeTargetCumulative: targetWeekCum,
+        pipePipesPerDay: v.pipe / PIPE_LENGTH_M,
+      };
+    });
+  }, [data, pipesPerDay, settings.targetRanges, viewMode]);
   const toggle = (key: keyof typeof visible) => () =>
     setVisible((v) => ({ ...v, [key]: !v[key] }));
 
@@ -300,7 +372,7 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
                     className="mb-1 block text-[11px] font-medium text-zinc-600"
                     title="Set the daily target in number of pipes."
                   >
-                    Target (pipes / day)
+                    Default target (pipes / day)
                   </label>
                   <input
                     type="number"
@@ -316,6 +388,100 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
                     className="h-8 w-28 rounded-md border border-border bg-white px-2 text-sm"
                     title="Set the daily target in number of pipes."
                   />
+                </div>
+                <div className="col-span-2 rounded-md border border-border bg-white/70 p-2">
+                  <div className="mb-2 text-[11px] font-medium text-zinc-700" title="Optional target schedule by date range.">
+                    Target ranges (date-based)
+                  </div>
+                  <div className="space-y-2">
+                    {(settings.targetRanges ?? []).map((r) => (
+                      <div key={r.id} className="flex flex-wrap items-center gap-2">
+                        <input
+                          type="date"
+                          className="h-8 rounded-md border border-border bg-white px-2 text-xs"
+                          value={r.start}
+                          onChange={(e) =>
+                            setSettings((s) => ({
+                              ...s,
+                              targetRanges: (s.targetRanges ?? []).map((x) =>
+                                x.id === r.id ? { ...x, start: e.target.value } : x
+                              ),
+                            }))
+                          }
+                          title="Range start date (inclusive)."
+                        />
+                        <input
+                          type="date"
+                          className="h-8 rounded-md border border-border bg-white px-2 text-xs"
+                          value={r.end}
+                          onChange={(e) =>
+                            setSettings((s) => ({
+                              ...s,
+                              targetRanges: (s.targetRanges ?? []).map((x) =>
+                                x.id === r.id ? { ...x, end: e.target.value } : x
+                              ),
+                            }))
+                          }
+                          title="Range end date (inclusive)."
+                        />
+                        <input
+                          type="number"
+                          min={0}
+                          step={0.5}
+                          className="h-8 w-24 rounded-md border border-border bg-white px-2 text-xs"
+                          value={r.pipesPerDay}
+                          onChange={(e) =>
+                            setSettings((s) => ({
+                              ...s,
+                              targetRanges: (s.targetRanges ?? []).map((x) =>
+                                x.id === r.id
+                                  ? {
+                                      ...x,
+                                      pipesPerDay: Math.max(0, Number(e.target.value) || 0),
+                                    }
+                                  : x
+                              ),
+                            }))
+                          }
+                          title="Target pipes per day for this range."
+                        />
+                        <button
+                          type="button"
+                          className="h-8 rounded-md border border-border bg-card px-2 text-xs text-zinc-700 hover:bg-muted"
+                          onClick={() =>
+                            setSettings((s) => ({
+                              ...s,
+                              targetRanges: (s.targetRanges ?? []).filter((x) => x.id !== r.id),
+                            }))
+                          }
+                          title="Remove this target range."
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      className="h-8 rounded-md border border-border bg-card px-2 text-xs font-medium text-zinc-700 hover:bg-muted"
+                      onClick={() =>
+                        setSettings((s) => ({
+                          ...s,
+                          targetRanges: [
+                            ...(s.targetRanges ?? []),
+                            {
+                              id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                              start: data[0]?.date ?? "",
+                              end: data[data.length - 1]?.date ?? "",
+                              pipesPerDay,
+                            },
+                          ],
+                        }))
+                      }
+                      title="Add a date range with custom target."
+                    >
+                      + Add range
+                    </button>
+                  </div>
                 </div>
 
                 {([

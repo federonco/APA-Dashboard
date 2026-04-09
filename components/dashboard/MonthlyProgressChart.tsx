@@ -59,6 +59,21 @@ type ChartEditorSettings = {
 
 const SETTINGS_KEY = "monthlyProgressChart.settings.v1";
 
+const WA_PUBLIC_HOLIDAYS: Record<number, string[]> = {
+  2025: ["2025-01-01", "2025-01-27", "2025-03-03", "2025-04-18", "2025-04-21", "2025-04-25", "2025-06-02", "2025-09-29", "2025-12-25", "2025-12-26"],
+  2026: ["2026-01-01", "2026-01-26", "2026-03-02", "2026-04-03", "2026-04-06", "2026-04-27", "2026-06-01", "2026-09-28", "2026-12-25", "2026-12-28"],
+  2027: ["2027-01-01", "2027-01-26", "2027-03-01", "2027-03-26", "2027-03-29", "2027-04-26", "2027-06-07", "2027-09-27", "2027-12-27", "2027-12-28"],
+};
+
+function isWaWorkingDay(dateStr: string): boolean {
+  const d = new Date(`${dateStr}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return true;
+  const day = d.getDay();
+  if (day === 0 || day === 6) return false;
+  const holidayList = WA_PUBLIC_HOLIDAYS[d.getFullYear()] ?? [];
+  return !holidayList.includes(dateStr);
+}
+
 function safeParseSettings(raw: string | null): ChartEditorSettings | null {
   if (!raw) return null;
   try {
@@ -170,7 +185,11 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
       const rangeMatch = (settings.targetRanges ?? []).find(
         (r) => r.start && r.end && d.date >= r.start && d.date <= r.end
       );
-      const activeTargetPipes = rangeMatch ? rangeMatch.pipesPerDay : pipesPerDay;
+      const activeTargetPipes = isWaWorkingDay(d.date)
+        ? rangeMatch
+          ? rangeMatch.pipesPerDay
+          : pipesPerDay
+        : 0;
       const targetMeters = activeTargetPipes * PIPE_LENGTH_M;
       targetCum += targetMeters;
       return {
@@ -200,7 +219,11 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
       const rangeMatch = (settings.targetRanges ?? []).find(
         (r) => r.start && r.end && d.date >= r.start && d.date <= r.end
       );
-      const activeTargetPipes = rangeMatch ? rangeMatch.pipesPerDay : pipesPerDay;
+      const activeTargetPipes = isWaWorkingDay(d.date)
+        ? rangeMatch
+          ? rangeMatch.pipesPerDay
+          : pipesPerDay
+        : 0;
       targetByWeek.set(w, prev + activeTargetPipes * PIPE_LENGTH_M);
     }
 

@@ -147,7 +147,7 @@ export type SectionProgressData = {
 };
 
 async function getPspLocationIdsForSection(
-  supabase: ReturnType<typeof createAdminClient>,
+  supabase: NonNullable<ReturnType<typeof createAdminClient>>,
   sectionId: string,
   crewId: string | null
 ): Promise<string[]> {

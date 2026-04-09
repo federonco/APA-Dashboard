@@ -29,7 +29,7 @@ function durationDays(startDate: string, endDate: string): number {
 
 export function PlannerTaskDrawer({ task, crewName, onClose }: Props) {
   return (
-    <aside className="h-[560px] rounded border border-zinc-200 bg-[#fafafa] p-2.5">
+    <aside className="h-full min-h-0 overflow-y-auto rounded border border-zinc-200 bg-[#fafafa] p-2.5">
       <div className="mb-3 flex items-start justify-between gap-2 border-b border-border pb-2.5">
         <div className="min-w-0">
           <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-400">

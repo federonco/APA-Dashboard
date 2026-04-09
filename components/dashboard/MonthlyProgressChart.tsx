@@ -601,7 +601,7 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
                 strokeOpacity={chartLineVisual.projectionStrokeOpacity}
             strokeDasharray={settings.target.dash || undefined}
                 dot={false}
-                name={`Target (${pipesPerDay} pipes)`}
+                name={`Target (at ${pipesPerDay} pipes/day)`}
               />
               {visible.pipe && (
                 <>

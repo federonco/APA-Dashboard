@@ -107,6 +107,7 @@ export function SectionProgress({ sections, progressBySection }: Props) {
   const installedCh = progress?.installedChainage ?? 0;
   const finalCh = progress?.finalChainage ?? 0;
   const pipeCount = progress?.pipeCount ?? 0;
+  const pspLodgedUpToChainage = progress?.pspLodgedUpToChainage ?? null;
 
   useEffect(() => {
     try {
@@ -371,17 +372,26 @@ export function SectionProgress({ sections, progressBySection }: Props) {
         onValueChange={(v) => setSelectedId(v)}
         className="w-full"
       >
-        <TabsList variant="line" className="mb-3 h-auto w-full justify-start">
-          {sections.map((s) => (
-            <TabsTrigger
-              key={s.id}
-              value={s.id}
-              className="after:hidden"
-            >
-              {s.name}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+        <div className="mb-2 max-w-xs">
+          <label
+            htmlFor="section-selector"
+            className="mb-1 block text-[11px] font-medium text-zinc-600"
+          >
+            Section selector
+          </label>
+          <select
+            id="section-selector"
+            className="h-8 w-full rounded-md border border-border bg-white px-2 text-sm"
+            value={selectedId}
+            onChange={(e) => setSelectedId(e.target.value)}
+          >
+            {sections.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </div>
         <div>
           <div
             style={{
@@ -433,6 +443,16 @@ export function SectionProgress({ sections, progressBySection }: Props) {
               >
                 {pipeCount} pipes installed
               </p>
+            </div>
+            <div
+              style={{
+                fontSize: tokens.typography.label,
+                color: tokens.text.muted,
+              }}
+            >
+              {pspLodgedUpToChainage != null
+                ? `PSP records lodged up to Ch ${pspLodgedUpToChainage.toFixed(1)} m`
+                : "PSP records lodged up to —"}
             </div>
             {expectedFinishText && (
               <div

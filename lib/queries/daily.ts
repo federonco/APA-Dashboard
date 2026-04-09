@@ -140,10 +140,46 @@ export type SectionProgressData = {
   sectionId: string;
   installedChainage: number;
   finalChainage: number;
+  pspLodgedUpToChainage: number | null;
   percent: number;
   pipeCount: number;
   avgPipesPerDay: number;
 };
+
+async function getPspLocationIdsForSection(
+  supabase: ReturnType<typeof createAdminClient>,
+  sectionId: string,
+  crewId: string | null
+): Promise<string[]> {
+  // Prefer direct section mapping when schema has it.
+  const bySection = await supabase
+    .from("locations")
+    .select("id")
+    .eq("location_type", "psp")
+    .eq("section_id", sectionId);
+  if (!bySection.error) {
+    return (bySection.data ?? []).map((r) => r.id);
+  }
+  if (bySection.error.code === "42703") {
+    const byDrainerSection = await supabase
+      .from("locations")
+      .select("id")
+      .eq("location_type", "psp")
+      .eq("drainer_section_id", sectionId);
+    if (!byDrainerSection.error) {
+      return (byDrainerSection.data ?? []).map((r) => r.id);
+    }
+  }
+  // Fallback to crew-scoped PSP locations.
+  if (!crewId) return [];
+  const byCrew = await supabase
+    .from("locations")
+    .select("id")
+    .eq("location_type", "psp")
+    .eq("crew_id", crewId);
+  if (byCrew.error) return [];
+  return (byCrew.data ?? []).map((r) => r.id);
+}
 
 export async function getSectionsForCrew(crewId: string | null): Promise<SectionInfo[]> {
   if (!hasSupabaseEnv() || !crewId) return [];
@@ -178,7 +214,7 @@ export async function getSectionChainageProgress(
     const [{ data: section }, { data: pipes }] = await Promise.all([
       supabase
         .from("drainer_sections")
-        .select("start_ch, end_ch, direction")
+        .select("start_ch, end_ch, direction, crew_id")
         .eq("id", sectionId)
         .maybeSingle(),
       supabase
@@ -191,6 +227,7 @@ export async function getSectionChainageProgress(
     const startCh = Number(section.start_ch) || 0;
     const endCh = Number(section.end_ch) || 0;
     const direction = section.direction === "backwards";
+    const crewId = (section as { crew_id?: string | null }).crew_id ?? null;
     const chainages = pipes.map((p) => Number(p.chainage)).filter((n) => !isNaN(n));
     const minCh = Math.min(...chainages);
     const maxCh = Math.max(...chainages);
@@ -216,10 +253,31 @@ export async function getSectionChainageProgress(
     ).size;
     const avgPipesPerDay =
       workedDays > 0 ? Math.round((pipes.length / workedDays) * 10) / 10 : 0;
+
+    const pspLocationIds = await getPspLocationIdsForSection(supabase, sectionId, crewId);
+    let pspLodgedUpToChainage: number | null = null;
+    if (pspLocationIds.length > 0) {
+      const { data: pspRows } = await supabase
+        .from("psp_records")
+        .select("chainage, location_id")
+        .in("location_id", pspLocationIds)
+        .not("chainage", "is", null);
+      const pspChainages = (pspRows ?? [])
+        .map((r) => Number((r as { chainage?: unknown }).chainage))
+        .filter((n) => !isNaN(n));
+      if (pspChainages.length > 0) {
+        pspLodgedUpToChainage = direction
+          ? Math.min(...pspChainages)
+          : Math.max(...pspChainages);
+      }
+    }
+
     return {
       sectionId,
       installedChainage: Math.round(installedChainage * 10) / 10,
       finalChainage,
+      pspLodgedUpToChainage:
+        pspLodgedUpToChainage != null ? Math.round(pspLodgedUpToChainage * 10) / 10 : null,
       percent,
       pipeCount: pipes.length,
       avgPipesPerDay,
@@ -722,22 +780,21 @@ export async function getCurrentMonthDailyProgress(
     const { data: pspRows, error: pspErr } = await pspQuery;
     if (pspErr) throw pspErr;
 
-    const backfillByDay = calculateDailyBackfillFromRecords(pspRows ?? [], workingDays);
-
     let pipeCum = 0;
-    let backfillCum = 0;
+    let prevBackfillCum = 0;
     const result = workingDays.map((d) => {
       const pipeM = Math.round(((pipeByDay[d] ?? 0) * PIPE_LENGTH_M) * 10) / 10;
-      const backfillM = backfillByDay[d] ?? 0;
       pipeCum += pipeM;
-      backfillCum += backfillM;
+      const mockBackfillCum = Math.max(0, Math.round((pipeCum - 25) * 10) / 10);
+      const backfillM = Math.max(0, Math.round((mockBackfillCum - prevBackfillCum) * 10) / 10);
+      prevBackfillCum = mockBackfillCum;
       return {
         date: d,
         label: dayToLabel(d),
         pipeMetres: pipeM,
         backfillMetres: backfillM,
         pipeMetresCumulative: Math.round(pipeCum * 10) / 10,
-        backfillMetresCumulative: Math.round(backfillCum * 10) / 10,
+        backfillMetresCumulative: mockBackfillCum,
       };
     });
     return result;

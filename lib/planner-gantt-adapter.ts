@@ -1,6 +1,8 @@
 import type { ITask } from "@svar-ui/react-gantt";
 import type { PlannerActivity, PlannerCrew } from "@/lib/planner-types";
 
+const DONE_TASK_COLOR = "#16a34a";
+
 function parseDate(value: string | null | undefined): Date | null {
   if (!value) return null;
   const parsed = new Date(`${value}T12:00:00`);
@@ -49,6 +51,8 @@ export function toPlannerGanttTasks(
       type: "task",
       progress: Math.max(0, Math.min(100, Number(activity.progress_percent) || 0)),
       status: activity.status,
+      color: activity.status === "done" ? DONE_TASK_COLOR : undefined,
+      barColor: activity.status === "done" ? DONE_TASK_COLOR : undefined,
       sort_order: activity.sort_order ?? 0,
     });
   }

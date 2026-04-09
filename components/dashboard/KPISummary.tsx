@@ -17,13 +17,12 @@ export function KPISummary({
   const kpiPad = tokens.components.kpiCard.padding;
   const items: { label: string; value: string; subValue?: string }[] = [
     { label: "Pipes installed today", value: String(pipesCount), subValue: `${pipeMeters.toFixed(1)} m` },
-    { label: "Backfill today", value: `${backfillMeters} m` },
     { label: "Water used today", value: `${waterKL} kL` },
   ];
   return (
     <section
-      className="grid grid-cols-3 gap-4"
-      style={{ marginBottom: tokens.spacing.gap }}
+      className="grid gap-4"
+      style={{ marginBottom: tokens.spacing.gap, gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
     >
       {items.map((item) => (
         <Card

@@ -29,13 +29,16 @@ function getHorizonStart(): Date {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
+function weekOfMonth(date: Date): number {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const first = new Date(d.getFullYear(), d.getMonth(), 1);
+  const offset = first.getDay();
+  return Math.ceil((d.getDate() + offset) / 7);
+}
+
 function weekLabel(date: Date): string {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const day = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - day);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-  return `W${weekNo}`;
+  const month = date.toLocaleDateString("en-AU", { month: "short" });
+  return `${month} W${weekOfMonth(date)}`;
 }
 
 function dayLabel(date: Date): string {
@@ -124,15 +127,15 @@ export function PlannerGanttCard() {
 
   return (
     <Card
-      className="planner-gantt-onsite overflow-hidden"
+      className="planner-gantt planner-gantt-onsite flex h-[min(72vh,calc(100dvh-13rem))] min-h-[280px] w-full max-w-full flex-col overflow-hidden rounded-dashboard-lg border border-dashboard-border bg-dashboard-surface p-4 shadow-dashboard-card"
       style={{
         background: "#fafafa",
-        border: "1px solid #f1f1f4",
-        borderRadius: 8,
+        border: "1px solid #e4e4e7",
+        borderRadius: 12,
         marginTop: tokens.spacing.gap,
       }}
     >
-      <CardHeader style={{ padding: "8px 10px 6px 10px" }}>
+      <CardHeader className="shrink-0" style={{ padding: "0 0 8px 0" }}>
         <div className="flex flex-col gap-1.5 md:flex-row md:items-center md:justify-between">
           <div className="space-y-1.5">
             <p
@@ -173,23 +176,23 @@ export function PlannerGanttCard() {
           </div>
         </div>
       </CardHeader>
-      <CardContent style={{ padding: "0 10px 10px 10px" }}>
+      <CardContent className="min-h-0 flex-1 px-0 pb-0" style={{ padding: 0 }}>
         {loading ? (
-          <div className="h-[500px] flex items-center justify-center rounded border border-dashed border-zinc-200 bg-white text-xs text-zinc-500">
+          <div className="h-full min-h-[220px] flex items-center justify-center rounded border border-dashed border-zinc-200 bg-white text-xs text-zinc-500">
             Loading planner timeline...
           </div>
         ) : error ? (
-          <div className="h-[500px] flex flex-col items-center justify-center rounded border border-red-200 bg-red-50/30 text-xs text-red-700">
+          <div className="h-full min-h-[220px] flex flex-col items-center justify-center rounded border border-red-200 bg-red-50/30 text-xs text-red-700">
             <span>Planner timeline unavailable</span>
             <span className="mt-1 text-xs">{error}</span>
           </div>
         ) : tasks.length === 0 ? (
-          <div className="h-[500px] flex items-center justify-center rounded border border-dashed border-zinc-200 bg-white text-xs text-zinc-500">
+          <div className="h-full min-h-[220px] flex items-center justify-center rounded border border-dashed border-zinc-200 bg-white text-xs text-zinc-500">
             No planner activities available in the selected horizon.
           </div>
         ) : (
-          <div className={`grid gap-2 ${selectedTask ? "grid-cols-1 xl:grid-cols-[1fr_292px]" : "grid-cols-1"}`}>
-            <div className="h-[560px] overflow-hidden rounded border border-zinc-200 bg-[#fafafa]" style={ganttStyle}>
+          <div className={`grid h-full min-h-0 gap-2 ${selectedTask ? "grid-cols-1 xl:grid-cols-[1fr_292px]" : "grid-cols-1"}`}>
+            <div className="h-full min-h-0 overflow-hidden rounded border border-zinc-200 bg-[#fafafa]" style={ganttStyle}>
               <Gantt
                 readonly
                 tasks={tasks}

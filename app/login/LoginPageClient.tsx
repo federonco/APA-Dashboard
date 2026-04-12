@@ -1,35 +1,56 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
-import { createClient } from "@/lib/supabase/client";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get("redirect") || "/";
+  const redirectParam = searchParams.get("redirect");
+  const errorParam = searchParams.get("error");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const urlError =
+    errorParam === "forbidden"
+      ? "Access denied (super admin only)"
+      : errorParam === "config"
+        ? "Server configuration error"
+        : "";
+
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
-    const supabase = createClient();
-    const { error: err } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-    setLoading(false);
-    if (err) {
-      setError(err.message);
-      return;
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data?.error ?? "Could not sign in");
+        setLoading(false);
+        return;
+      }
+      const target =
+        redirectParam && redirectParam.startsWith("/") && !redirectParam.startsWith("//")
+          ? redirectParam
+          : "/admin";
+      router.push(target);
+      router.refresh();
+    } catch {
+      setError("Network error");
+    } finally {
+      setLoading(false);
     }
-    router.push(redirect);
   }
 
   return (
@@ -47,9 +68,9 @@ function LoginForm() {
           width: "100%",
         }}
       >
-        <h1 style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}>Login</h1>
+        <h1 style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}>Login admin</h1>
         <p style={{ fontSize: 14, color: "#71717a", marginBottom: 24 }}>
-          Enter your email and password to sign in.
+          Super admin only. Email and password.
         </p>
         <form onSubmit={handleSignIn} className="flex flex-col gap-4">
           <input
@@ -72,13 +93,15 @@ function LoginForm() {
             className="selection:bg-[#D1D5DB] selection:text-[#111827]"
             style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid #E8E6EB", fontSize: 14 }}
           />
-          {error && <p style={{ color: "#dc2626", fontSize: 13 }}>{error}</p>}
+          {(error || urlError) && (
+            <p style={{ color: "#dc2626", fontSize: 13 }}>{error || urlError}</p>
+          )}
           <button
             type="submit"
             disabled={loading}
             className="w-full cursor-pointer rounded-lg border-none bg-[#D1D5DB] px-4 py-2 text-[0.875rem] font-medium text-[#111827] transition-[color,background-color] duration-150 hover:bg-[#E5E7EB] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? "Signing in..." : "Sign in"}
+            {loading ? "Signing in…" : "Sign in"}
           </button>
         </form>
         <Link

@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
+import { AdminShell } from "@/components/admin/AdminShell";
 
 export const metadata: Metadata = {
   title: "Admin — APA Dashboard",
-  description: "Admin panel for Alkimos Pipeline Alliance",
+  description: "OnSite admin panel",
 };
 
 export default function AdminLayout({
@@ -10,5 +11,5 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <>{children}</>;
+  return <AdminShell>{children}</AdminShell>;
 }

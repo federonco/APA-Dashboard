@@ -7,6 +7,7 @@ import { tokens } from "@/lib/designTokens";
 const links = [
   { href: "/admin", label: "Admins" },
   { href: "/admin/sections", label: "Sections" },
+  { href: "/admin/cards", label: "Dashboard cards" },
 ];
 
 export function AdminShell({ children }: { children: React.ReactNode }) {

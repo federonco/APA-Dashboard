@@ -2,9 +2,6 @@ import {
   getCrewId,
   getTodayWaterByActivity,
   getActiveVehicleCount,
-  fetchPipesToday,
-  fetchBackfillToday,
-  fetchWaterToday,
   getCurrentMonthDailyProgress,
   getHistoricMonthlyProgress,
   getSectionsForCrew,
@@ -13,7 +10,7 @@ import {
 import { getSpreadsheetData } from "@/lib/queries/spreadsheet";
 import { Header } from "@/components/dashboard/Header";
 import { NavTabs } from "@/components/dashboard/NavTabs";
-import { KPISummary } from "@/components/dashboard/KPISummary";
+import { MetricCardsDisplay } from "@/components/dashboard/MetricCardsDisplay";
 import { SectionProgress } from "@/components/dashboard/SectionProgress";
 import { MonthlyProgressChart } from "@/components/dashboard/MonthlyProgressChart";
 import { WaterConsumptionChart } from "@/components/dashboard/WaterConsumptionChart";
@@ -66,23 +63,13 @@ export default async function Page({ searchParams }: Props) {
 
   // Dashboard: fetch all dashboard data
   const crewId = await getCrewId(crewForQueries);
-  const [
-    pipesTodayRes,
-    backfillTodayRes,
-    waterTodayRes,
-    waterByActivity,
-    activeVehicleCount,
-    currentMonthProgress,
-    historicProgress,
-  ] = await Promise.all([
-    fetchPipesToday(crewId ?? undefined, selectedDate),
-    fetchBackfillToday(crewId ?? undefined, selectedDate),
-    fetchWaterToday(crewForQueries, selectedDate),
-    getTodayWaterByActivity(crewForQueries, selectedDate),
-    getActiveVehicleCount(crewForQueries, selectedDate),
-    getCurrentMonthDailyProgress(crewId ?? undefined),
-    getHistoricMonthlyProgress(crewId ?? undefined),
-  ]);
+  const [waterByActivity, activeVehicleCount, currentMonthProgress, historicProgress] =
+    await Promise.all([
+      getTodayWaterByActivity(crewForQueries, selectedDate),
+      getActiveVehicleCount(crewForQueries, selectedDate),
+      getCurrentMonthDailyProgress(crewId ?? undefined),
+      getHistoricMonthlyProgress(crewId ?? undefined),
+    ]);
 
   const sections = crewId ? await getSectionsForCrew(crewId) : [];
   const progressBySection: Record<string, Awaited<ReturnType<typeof getSectionChainageProgress>>> = {};
@@ -120,11 +107,7 @@ export default async function Page({ searchParams }: Props) {
         ) : (
           <>
             <DaySelector currentDate={rawDate} />
-            <KPISummary
-              pipesCount={pipesTodayRes.data.count}
-              backfillMeters={backfillTodayRes.data.meters}
-              waterKL={waterTodayRes.data.totalKL}
-            />
+            <MetricCardsDisplay date={selectedDate} />
             <SectionProgress sections={sections} progressBySection={progressBySection} />
             <div
               className="grid grid-cols-3 gap-6 items-stretch"

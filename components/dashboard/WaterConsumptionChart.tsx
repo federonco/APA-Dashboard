@@ -73,10 +73,6 @@ export function WaterConsumptionChart({ data, vehicleLitres = 0, activeVehicles 
     () => baseItems.filter((i) => visible[i.name] ?? true),
     [baseItems, visible]
   );
-  const totalLitres = useMemo(
-    () => baseItems.reduce((sum, item) => sum + item.value, 0),
-    [baseItems]
-  );
 
   const toggle = (name: string) => () =>
     setVisible((v) => ({ ...v, [name]: !(v[name] ?? true) }));
@@ -96,7 +92,7 @@ export function WaterConsumptionChart({ data, vehicleLitres = 0, activeVehicles 
           padding: 0,
           marginBottom: 12,
           display: "flex",
-          justifyContent: "space-between",
+          justifyContent: "flex-start",
           alignItems: "flex-start",
         }}
       >
@@ -123,19 +119,6 @@ export function WaterConsumptionChart({ data, vehicleLitres = 0, activeVehicles 
             </span>
           )}
         </div>
-        <span
-          style={{
-            borderRadius: tokens.radius.badge,
-            background: tokens.theme.border,
-            padding: "4px 8px",
-            fontSize: tokens.typography.body,
-            fontWeight: 600,
-            color: tokens.text.primary,
-            fontVariantNumeric: "tabular-nums",
-          }}
-        >
-          {Math.round(totalLitres).toLocaleString("en-AU")} L
-        </span>
       </CardHeader>
       <CardContent style={{ padding: 0 }} className="flex-1 flex flex-col min-h-0">
         <div

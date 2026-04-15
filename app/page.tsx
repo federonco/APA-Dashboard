@@ -5,7 +5,9 @@ import {
   getCurrentMonthDailyProgress,
   getHistoricMonthlyProgress,
   getSectionsForCrew,
-  getSectionChainageProgress,
+  getDrainerSubsectionsForCrew,
+  getAggregatedSectionProgress,
+  type SectionProgressScope,
 } from "@/lib/queries/daily";
 import { getSpreadsheetData } from "@/lib/queries/spreadsheet";
 import { Header } from "@/components/dashboard/Header";
@@ -72,12 +74,13 @@ export default async function Page({ searchParams }: Props) {
     ]);
 
   const sections = crewId ? await getSectionsForCrew(crewId) : [];
-  const progressBySection: Record<string, Awaited<ReturnType<typeof getSectionChainageProgress>>> = {};
-  await Promise.all(
-    sections.map(async (s) => {
-      progressBySection[s.id] = await getSectionChainageProgress(s.id);
-    })
-  );
+  const subsections = crewId ? await getDrainerSubsectionsForCrew(crewId) : [];
+  const defaultScopes: SectionProgressScope[] = sections.map((s) => ({
+    sectionId: s.id,
+    ranges: null,
+  }));
+  const sectionProgressInitial =
+    defaultScopes.length > 0 ? await getAggregatedSectionProgress(defaultScopes) : null;
 
   return (
     <div
@@ -108,7 +111,12 @@ export default async function Page({ searchParams }: Props) {
           <>
             <DaySelector currentDate={rawDate} />
             <MetricCardsDisplay date={selectedDate} />
-            <SectionProgress sections={sections} progressBySection={progressBySection} />
+            <SectionProgress
+              sections={sections}
+              subsections={subsections}
+              crewCode={crewForQueries}
+              initialProgress={sectionProgressInitial}
+            />
             <div
               className="grid grid-cols-3 gap-6 items-stretch"
               style={{ gap: tokens.spacing.gap }}

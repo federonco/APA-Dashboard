@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { MetricKey } from "@/lib/metric-catalogue";
+import { getVehicleIdsForCrew } from "@/lib/queries/daily";
 
 function dayStartEndPerth(dateStr: string): { start: string; end: string } {
   return {
@@ -48,6 +49,19 @@ export async function resolveDrainerSectionId(
     if (ds?.id) return ds.id;
   }
   return null;
+}
+
+/** Same crew scoping as fetchWaterByTask / fetchWaterToday (legacy rows: crew_id null + vehicle on crew). */
+async function wcWaterLogsCrewFilter(
+  crewId: string
+): Promise<{ or: string } | { eqCrew: string }> {
+  const vehicleIds = await getVehicleIdsForCrew(crewId);
+  if (vehicleIds.length > 0) {
+    return {
+      or: `crew_id.eq.${crewId},and(crew_id.is.null,vehicle_id.in.(${vehicleIds.join(",")}))`,
+    };
+  }
+  return { eqCrew: crewId };
 }
 
 export async function getSubsectionChainageRange(
@@ -195,24 +209,28 @@ export async function computeMetricValue(
     case "water_loads_today": {
       if (!crewId) return 0;
       const { start, end } = dayStartEndPerth(dateStr);
-      const { count, error } = await admin
+      const crewScope = await wcWaterLogsCrewFilter(crewId);
+      let q = admin
         .from("wc_water_logs")
         .select("id", { count: "exact", head: true })
-        .eq("crew_id", crewId)
         .gte("created_at", start)
         .lte("created_at", end);
+      q = "or" in crewScope ? q.or(crewScope.or) : q.eq("crew_id", crewScope.eqCrew);
+      const { count, error } = await q;
       if (error) throw error;
       return count ?? 0;
     }
     case "water_liters_today": {
       if (!crewId) return 0;
       const { start, end } = dayStartEndPerth(dateStr);
-      const { data, error } = await admin
+      const crewScope = await wcWaterLogsCrewFilter(crewId);
+      let q = admin
         .from("wc_water_logs")
         .select("volume_liters")
-        .eq("crew_id", crewId)
         .gte("created_at", start)
         .lte("created_at", end);
+      q = "or" in crewScope ? q.or(crewScope.or) : q.eq("crew_id", crewScope.eqCrew);
+      const { data, error } = await q;
       if (error) throw error;
       const sum = (data ?? []).reduce(
         (s, r) => s + (Number((r as { volume_liters?: number }).volume_liters) || 0),

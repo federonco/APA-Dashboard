@@ -105,7 +105,7 @@ export async function getCrewId(crewName: string): Promise<string | null> {
   return data?.id ?? null;
 }
 
-async function getVehicleIdsForCrew(crewId: string): Promise<string[]> {
+export async function getVehicleIdsForCrew(crewId: string): Promise<string[]> {
   const supabase = createAdminClient();
   if (!supabase) return [];
   const { data, error } = await supabase
@@ -144,6 +144,147 @@ export type SectionProgressData = {
   percent: number;
   pipeCount: number;
   avgPipesPerDay: number;
+  /** True when the value combines multiple drainer sections or scoped ranges. */
+  isAggregated?: boolean;
+  /** Min/max chainage among pipes in scope (metres). */
+  pipeMinCh?: number;
+  pipeMaxCh?: number;
+  /** Selected scope along-chain extent (subsection union or full section), metres. */
+  scopeChainageLo?: number;
+  scopeChainageHi?: number;
+  /** When multiple scopes contribute PSP figures (metres). */
+  pspLodgedMinCh?: number;
+  pspLodgedMaxCh?: number;
+};
+
+/** Chainage interval (metres) for OnSite-D subsection scoping; min/max order normalized internally. */
+export type ChainageScopeRange = { min: number; max: number };
+
+export type DrainerSubsectionInfo = {
+  id: string;
+  name: string;
+  startCh: number;
+  endCh: number;
+  drainerSectionId: string;
+};
+
+export async function resolveUnifiedSectionIdForDrainer(
+  drainerSectionId: string
+): Promise<string | null> {
+  if (!hasSupabaseEnv()) return null;
+  const supabase = createAdminClient();
+  if (!supabase) return null;
+  const { data: direct } = await supabase
+    .from("sections")
+    .select("id")
+    .eq("id", drainerSectionId)
+    .maybeSingle();
+  if (direct?.id) return direct.id;
+  const { data: byLegacy } = await supabase
+    .from("sections")
+    .select("id, app_config")
+    .not("app_config", "is", null);
+  for (const row of byLegacy ?? []) {
+    const cfg = row.app_config as Record<string, unknown> | null;
+    if (cfg && String(cfg.legacy_id ?? "") === drainerSectionId) {
+      return (row as { id: string }).id;
+    }
+  }
+
+  // Fallback: unified `sections` row whose name matches this drainer (subsections hang off `sections`).
+  const { data: drRow } = await supabase
+    .from("drainer_sections")
+    .select("name")
+    .eq("id", drainerSectionId)
+    .maybeSingle();
+  const drName = String((drRow as { name?: string | null })?.name ?? "").trim();
+  if (drName.length > 0) {
+    const { data: exactHits } = await supabase
+      .from("sections")
+      .select("id")
+      .ilike("name", drName)
+      .limit(2);
+    if (exactHits?.length === 1) {
+      return (exactHits[0] as { id: string }).id;
+    }
+    const { data: fuzzyHits } = await supabase
+      .from("sections")
+      .select("id")
+      .ilike("name", `%${drName}%`)
+      .limit(2);
+    if (fuzzyHits?.length === 1) {
+      return (fuzzyHits[0] as { id: string }).id;
+    }
+  }
+
+  return null;
+}
+
+export async function getDrainerSubsectionsForCrew(
+  crewId: string | null
+): Promise<DrainerSubsectionInfo[]> {
+  if (!hasSupabaseEnv() || !crewId) return [];
+  const supabase = createAdminClient();
+  if (!supabase) return [];
+  try {
+    const { data: drainers, error: de } = await supabase
+      .from("drainer_sections")
+      .select("id")
+      .eq("crew_id", crewId);
+    if (de) throw de;
+    const out: DrainerSubsectionInfo[] = [];
+    for (const d of drainers ?? []) {
+      const drainerId = (d as { id: string }).id;
+      const unifiedId = await resolveUnifiedSectionIdForDrainer(drainerId);
+      if (!unifiedId) continue;
+      const { data: subs, error: se } = await supabase
+        .from("subsections")
+        .select("id, name, start_ch, end_ch")
+        .eq("section_id", unifiedId)
+        .order("name");
+      if (se) continue;
+      for (const s of subs ?? []) {
+        const a = Number((s as { start_ch?: unknown }).start_ch);
+        const b = Number((s as { end_ch?: unknown }).end_ch);
+        if (Number.isNaN(a) || Number.isNaN(b)) continue;
+        out.push({
+          id: (s as { id: string }).id,
+          name: String((s as { name?: string }).name ?? "Subsection"),
+          startCh: a,
+          endCh: b,
+          drainerSectionId: drainerId,
+        });
+      }
+    }
+    return out;
+  } catch (e) {
+    console.error("[Dashboard] getDrainerSubsectionsForCrew failed:", e);
+    return [];
+  }
+}
+
+function normalizeChainageRanges(ranges: ChainageScopeRange[]): ChainageScopeRange[] {
+  const norm = ranges
+    .map((r) => ({ min: Math.min(r.min, r.max), max: Math.max(r.min, r.max) }))
+    .filter((r) => r.max > r.min && Number.isFinite(r.min) && Number.isFinite(r.max))
+    .sort((a, b) => a.min - b.min);
+  const merged: ChainageScopeRange[] = [];
+  for (const r of norm) {
+    const last = merged[merged.length - 1];
+    if (!last || r.min > last.max) merged.push({ ...r });
+    else last.max = Math.max(last.max, r.max);
+  }
+  return merged;
+}
+
+function chainageInRanges(ch: number, ranges: ChainageScopeRange[]): boolean {
+  return ranges.some((r) => ch >= r.min && ch <= r.max);
+}
+
+export type SectionProgressScope = {
+  sectionId: string;
+  /** null = full drainer section; non-empty = union of chainage windows (OnSite-D subsections). */
+  ranges: ChainageScopeRange[] | null;
 };
 
 async function getPspLocationIdsForSection(
@@ -204,86 +345,269 @@ export async function getSectionsForCrew(crewId: string | null): Promise<Section
   }
 }
 
+async function computeSectionChainageProgress(
+  supabase: NonNullable<ReturnType<typeof createAdminClient>>,
+  sectionId: string,
+  scopeRanges: ChainageScopeRange[] | null
+): Promise<SectionProgressData | null> {
+  const [{ data: section }, { data: pipesRaw }] = await Promise.all([
+    supabase
+      .from("drainer_sections")
+      .select("start_ch, end_ch, direction, crew_id")
+      .eq("id", sectionId)
+      .maybeSingle(),
+    supabase
+      .from("drainer_pipe_records")
+      .select("chainage, date_installed")
+      .eq("section_id", sectionId)
+      .not("chainage", "is", null),
+  ]);
+  if (!section) return null;
+
+  const startCh = Number(section.start_ch) || 0;
+  const endCh = Number(section.end_ch) || 0;
+  const direction = section.direction === "backwards";
+  const crewId = (section as { crew_id?: string | null }).crew_id ?? null;
+  const totalSectionLength = Math.abs(startCh - endCh);
+  if (totalSectionLength <= 0) return null;
+
+  const mergedScopes =
+    scopeRanges && scopeRanges.length > 0 ? normalizeChainageRanges(scopeRanges) : null;
+
+  const pipes = (pipesRaw ?? []).filter((p) => {
+    const ch = Number((p as { chainage?: unknown }).chainage);
+    if (Number.isNaN(ch)) return false;
+    if (!mergedScopes || mergedScopes.length === 0) return true;
+    return chainageInRanges(ch, mergedScopes);
+  });
+
+  const scopeChainageLo =
+    mergedScopes && mergedScopes.length > 0
+      ? Math.min(...mergedScopes.map((r) => r.min))
+      : Math.min(startCh, endCh);
+  const scopeChainageHi =
+    mergedScopes && mergedScopes.length > 0
+      ? Math.max(...mergedScopes.map((r) => r.max))
+      : Math.max(startCh, endCh);
+
+  if (!pipes.length) {
+    if (!mergedScopes || mergedScopes.length === 0) return null;
+    return {
+      sectionId,
+      installedChainage: direction ? endCh : startCh,
+      finalChainage: endCh,
+      pspLodgedUpToChainage: null,
+      percent: 0,
+      pipeCount: 0,
+      avgPipesPerDay: 0,
+      scopeChainageLo: Math.round(scopeChainageLo * 10) / 10,
+      scopeChainageHi: Math.round(scopeChainageHi * 10) / 10,
+    };
+  }
+
+  const chainages = pipes.map((p) => Number((p as { chainage?: unknown }).chainage)).filter((n) => !isNaN(n));
+  const minCh = Math.min(...chainages);
+  const maxCh = Math.max(...chainages);
+
+  let totalLength: number;
+  let metresCovered: number;
+  let installedChainage: number;
+  const finalChainage = endCh;
+
+  if (!mergedScopes || mergedScopes.length === 0) {
+    totalLength = totalSectionLength;
+    metresCovered = direction ? startCh - minCh : maxCh - startCh;
+    installedChainage = direction ? minCh : maxCh;
+  } else {
+    totalLength = mergedScopes.reduce((s, r) => s + (r.max - r.min), 0);
+    if (totalLength <= 0) return null;
+    metresCovered = 0;
+    for (const r of mergedScopes) {
+      const inRange = pipes.filter((p) => {
+        const ch = Number((p as { chainage?: unknown }).chainage);
+        return !Number.isNaN(ch) && ch >= r.min && ch <= r.max;
+      });
+      if (inRange.length === 0) continue;
+      if (direction) {
+        const minR = Math.min(...inRange.map((p) => Number((p as { chainage?: unknown }).chainage)));
+        metresCovered += Math.max(0, r.max - Math.max(r.min, minR));
+        installedChainage = minCh;
+      } else {
+        const maxR = Math.max(...inRange.map((p) => Number((p as { chainage?: unknown }).chainage)));
+        metresCovered += Math.max(0, Math.min(r.max, maxR) - r.min);
+        installedChainage = maxCh;
+      }
+    }
+    if (!direction) installedChainage = maxCh;
+    else installedChainage = minCh;
+  }
+
+  const percent = Math.min(100, Math.round((metresCovered / totalLength) * 100));
+  const workedDays = new Set(
+    pipes.map((p) => (p as { date_installed?: string | null }).date_installed).filter((d): d is string => !!d)
+  ).size;
+  const avgPipesPerDay =
+    workedDays > 0 ? Math.round((pipes.length / workedDays) * 10) / 10 : 0;
+
+  const pspLocationIds = await getPspLocationIdsForSection(supabase, sectionId, crewId);
+  let pspLodgedUpToChainage: number | null = null;
+  if (pspLocationIds.length > 0) {
+    const { data: pspRows } = await supabase
+      .from("psp_records")
+      .select("chainage, location_id")
+      .in("location_id", pspLocationIds)
+      .not("chainage", "is", null);
+    let pspChainages = (pspRows ?? [])
+      .map((r) => Number((r as { chainage?: unknown }).chainage))
+      .filter((n) => !isNaN(n));
+    if (mergedScopes && mergedScopes.length > 0) {
+      pspChainages = pspChainages.filter((ch) => chainageInRanges(ch, mergedScopes));
+    }
+    if (pspChainages.length > 0) {
+      pspLodgedUpToChainage = direction
+        ? Math.min(...pspChainages)
+        : Math.max(...pspChainages);
+    }
+  }
+
+  return {
+    sectionId,
+    installedChainage: Math.round(installedChainage * 10) / 10,
+    finalChainage,
+    pspLodgedUpToChainage:
+      pspLodgedUpToChainage != null ? Math.round(pspLodgedUpToChainage * 10) / 10 : null,
+    percent,
+    pipeCount: pipes.length,
+    avgPipesPerDay,
+    pipeMinCh: Math.round(minCh * 10) / 10,
+    pipeMaxCh: Math.round(maxCh * 10) / 10,
+    scopeChainageLo: Math.round(scopeChainageLo * 10) / 10,
+    scopeChainageHi: Math.round(scopeChainageHi * 10) / 10,
+  };
+}
+
 export async function getSectionChainageProgress(
-  sectionId: string
+  sectionId: string,
+  scopeRanges?: ChainageScopeRange[] | null
 ): Promise<SectionProgressData | null> {
   if (!hasSupabaseEnv()) return null;
   try {
     const supabase = createAdminClient();
     if (!supabase) return null;
-    const [{ data: section }, { data: pipes }] = await Promise.all([
-      supabase
-        .from("drainer_sections")
-        .select("start_ch, end_ch, direction, crew_id")
-        .eq("id", sectionId)
-        .maybeSingle(),
-      supabase
-        .from("drainer_pipe_records")
-        .select("chainage, date_installed")
-        .eq("section_id", sectionId)
-        .not("chainage", "is", null),
-    ]);
-    if (!section || !pipes?.length) return null;
-    const startCh = Number(section.start_ch) || 0;
-    const endCh = Number(section.end_ch) || 0;
-    const direction = section.direction === "backwards";
-    const crewId = (section as { crew_id?: string | null }).crew_id ?? null;
-    const chainages = pipes.map((p) => Number(p.chainage)).filter((n) => !isNaN(n));
-    const minCh = Math.min(...chainages);
-    const maxCh = Math.max(...chainages);
-    const totalLength = Math.abs(startCh - endCh);
-    if (totalLength <= 0) return null;
-    let installedChainage: number;
-    let finalChainage = endCh;
-    if (direction) {
-      installedChainage = minCh;
-      finalChainage = endCh;
-    } else {
-      installedChainage = maxCh;
-      finalChainage = endCh;
-    }
-    const metresCovered = direction
-      ? startCh - minCh
-      : maxCh - startCh;
-    const percent = Math.min(100, Math.round((metresCovered / totalLength) * 100));
-    const workedDays = new Set(
-      (pipes ?? [])
-        .map((p) => (p as { date_installed?: string | null }).date_installed)
-        .filter((d): d is string => !!d)
-    ).size;
-    const avgPipesPerDay =
-      workedDays > 0 ? Math.round((pipes.length / workedDays) * 10) / 10 : 0;
-
-    const pspLocationIds = await getPspLocationIdsForSection(supabase, sectionId, crewId);
-    let pspLodgedUpToChainage: number | null = null;
-    if (pspLocationIds.length > 0) {
-      const { data: pspRows } = await supabase
-        .from("psp_records")
-        .select("chainage, location_id")
-        .in("location_id", pspLocationIds)
-        .not("chainage", "is", null);
-      const pspChainages = (pspRows ?? [])
-        .map((r) => Number((r as { chainage?: unknown }).chainage))
-        .filter((n) => !isNaN(n));
-      if (pspChainages.length > 0) {
-        pspLodgedUpToChainage = direction
-          ? Math.min(...pspChainages)
-          : Math.max(...pspChainages);
-      }
-    }
-
-    return {
-      sectionId,
-      installedChainage: Math.round(installedChainage * 10) / 10,
-      finalChainage,
-      pspLodgedUpToChainage:
-        pspLodgedUpToChainage != null ? Math.round(pspLodgedUpToChainage * 10) / 10 : null,
-      percent,
-      pipeCount: pipes.length,
-      avgPipesPerDay,
-    };
+    return computeSectionChainageProgress(supabase, sectionId, scopeRanges ?? null);
   } catch (err) {
     console.error("[Dashboard] getSectionChainageProgress failed:", err);
+    return null;
+  }
+}
+
+/** Combine multiple OnSite-D scopes (sections and/or subsection chainage windows) into one summary. */
+export async function getAggregatedSectionProgress(
+  scopes: SectionProgressScope[]
+): Promise<SectionProgressData | null> {
+  if (!hasSupabaseEnv() || scopes.length === 0) return null;
+  const supabase = createAdminClient();
+  if (!supabase) return null;
+  try {
+    const entries: { scope: SectionProgressScope; progress: SectionProgressData }[] = [];
+    for (const s of scopes) {
+      const p = await computeSectionChainageProgress(supabase, s.sectionId, s.ranges);
+      if (p) entries.push({ scope: s, progress: p });
+    }
+    if (entries.length === 0) return null;
+    if (entries.length === 1) {
+      return scopes.length > 1
+        ? { ...entries[0].progress, isAggregated: true }
+        : entries[0].progress;
+    }
+
+    const parts = entries.map((e) => e.progress);
+    const totalPipes = parts.reduce((a, p) => a + p.pipeCount, 0);
+    const weightedAvg =
+      totalPipes > 0
+        ? parts.reduce((a, p) => a + p.avgPipesPerDay * p.pipeCount, 0) / totalPipes
+        : 0;
+    const plannedLengths = await Promise.all(
+      entries.map(async ({ scope: sc }) => {
+        const { data: sec } = await supabase
+          .from("drainer_sections")
+          .select("start_ch, end_ch")
+          .eq("id", sc.sectionId)
+          .maybeSingle();
+        if (!sec) return 0;
+        const a = Number(sec.start_ch);
+        const b = Number(sec.end_ch);
+        const full = Math.abs(a - b);
+        if (sc.ranges && sc.ranges.length > 0) {
+          const m = normalizeChainageRanges(sc.ranges);
+          return m.reduce((s, r) => s + (r.max - r.min), 0);
+        }
+        return full;
+      })
+    );
+    const coveredSum = parts.reduce(
+      (a, p, i) => a + (plannedLengths[i] ?? 0) * (p.percent / 100),
+      0
+    );
+    const plannedTotal = plannedLengths.reduce((a, b) => a + b, 0);
+    const percent =
+      plannedTotal > 0 ? Math.min(100, Math.round((coveredSum / plannedTotal) * 100)) : 0;
+
+    const pipeMins = parts
+      .map((p) => p.pipeMinCh)
+      .filter((v): v is number => v != null && Number.isFinite(v));
+    const pipeMaxs = parts
+      .map((p) => p.pipeMaxCh)
+      .filter((v): v is number => v != null && Number.isFinite(v));
+    const scopeLos = parts
+      .map((p) => p.scopeChainageLo)
+      .filter((v): v is number => v != null && Number.isFinite(v));
+    const scopeHis = parts
+      .map((p) => p.scopeChainageHi)
+      .filter((v): v is number => v != null && Number.isFinite(v));
+
+    const pipeMinAgg = pipeMins.length ? Math.min(...pipeMins) : undefined;
+    const pipeMaxAgg = pipeMaxs.length ? Math.max(...pipeMaxs) : undefined;
+    const scopeLoAgg = scopeLos.length ? Math.min(...scopeLos) : undefined;
+    const scopeHiAgg = scopeHis.length ? Math.max(...scopeHis) : undefined;
+
+    const pspVals = parts
+      .map((p) => p.pspLodgedUpToChainage)
+      .filter((v): v is number => v != null && Number.isFinite(v));
+    let pspMinAgg: number | undefined;
+    let pspMaxAgg: number | undefined;
+    if (pspVals.length > 0) {
+      pspMinAgg = Math.min(...pspVals);
+      pspMaxAgg = Math.max(...pspVals);
+    }
+    const pspSingle =
+      pspMinAgg != null &&
+      pspMaxAgg != null &&
+      Math.abs(pspMinAgg - pspMaxAgg) < 0.05
+        ? Math.round(pspMinAgg * 10) / 10
+        : null;
+
+    return {
+      sectionId: parts.map((p) => p.sectionId).join(","),
+      installedChainage:
+        pipeMaxAgg != null ? Math.round(pipeMaxAgg * 10) / 10 : 0,
+      finalChainage: scopeHiAgg != null ? Math.round(scopeHiAgg * 10) / 10 : 0,
+      pspLodgedUpToChainage: pspSingle,
+      pspLodgedMinCh:
+        pspMinAgg != null ? Math.round(pspMinAgg * 10) / 10 : undefined,
+      pspLodgedMaxCh:
+        pspMaxAgg != null ? Math.round(pspMaxAgg * 10) / 10 : undefined,
+      percent,
+      pipeCount: totalPipes,
+      avgPipesPerDay: Math.round(weightedAvg * 10) / 10,
+      isAggregated: true,
+      pipeMinCh: pipeMinAgg != null ? Math.round(pipeMinAgg * 10) / 10 : undefined,
+      pipeMaxCh: pipeMaxAgg != null ? Math.round(pipeMaxAgg * 10) / 10 : undefined,
+      scopeChainageLo: scopeLoAgg != null ? Math.round(scopeLoAgg * 10) / 10 : undefined,
+      scopeChainageHi: scopeHiAgg != null ? Math.round(scopeHiAgg * 10) / 10 : undefined,
+    };
+  } catch (err) {
+    console.error("[Dashboard] getAggregatedSectionProgress failed:", err);
     return null;
   }
 }

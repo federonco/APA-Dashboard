@@ -11,6 +11,7 @@ import {
   type SectionProgressScope,
   type SectionProgressData,
 } from "@/lib/queries/daily";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getSpreadsheetData } from "@/lib/queries/spreadsheet";
 import { Header } from "@/components/dashboard/Header";
 import { NavTabs } from "@/components/dashboard/NavTabs";
@@ -79,6 +80,24 @@ export default async function Page({ searchParams }: Props) {
   const sections = crewId ? await getSectionsForCrew(crewId) : [];
   const subsections = crewId ? await getDrainerSubsectionsForCrew(crewId) : [];
 
+  // Filter sections for portfolio based on show_in_portfolio flag
+  const adminClient = createAdminClient();
+  let portfolioSections = sections;
+  if (adminClient && sections.length > 0) {
+    const { data: portfolioFlags } = await adminClient
+      .from("sections")
+      .select("app_config, show_in_portfolio")
+      .eq("is_active", true);
+
+    const portfolioLegacyIds = new Set<string>(
+      (portfolioFlags ?? [])
+        .filter((r) => r.show_in_portfolio !== false)
+        .map((r) => (r.app_config as Record<string, unknown>)?.legacy_id as string)
+        .filter(Boolean)
+    );
+    portfolioSections = sections.filter((s) => portfolioLegacyIds.has(s.id));
+  }
+
   const perSectionProgress: Record<string, SectionProgressData> = {};
   if (crewId && sections.length > 0) {
     const results = await Promise.all(
@@ -127,7 +146,7 @@ export default async function Page({ searchParams }: Props) {
           <>
             <DaySelector currentDate={rawDate} />
             <SectionPortfolioView
-              sections={sections}
+              sections={portfolioSections}
               progress={perSectionProgress}
               crewCode={crewForQueries}
             />

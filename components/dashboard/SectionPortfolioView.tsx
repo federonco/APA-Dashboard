@@ -29,12 +29,12 @@ export function SectionPortfolioView({ sections, progress, crewCode }: SectionPo
 
         const pct = Math.min(100, Math.max(0, p.percent));
         let badge: { label: string; emoji: string };
-        if (p.pipeCount === 0) {
-          badge = { label: "Not started", emoji: "⚪" };
-        } else if (p.avgPipesPerDay > 0) {
+        if (p.pipeCount > 0 && p.avgPipesPerDay > 0) {
           badge = { label: "Active", emoji: "🟢" };
-        } else {
+        } else if (p.pipeCount > 0 && p.avgPipesPerDay === 0) {
           badge = { label: "Idle", emoji: "🟡" };
+        } else {
+          badge = { label: "Open", emoji: "🔵" };
         }
 
         return (

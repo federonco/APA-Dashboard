@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
   const admin = requireAdminClient();
   let secQuery = admin
     .from("sections")
-    .select("id, name, scope, app_id, start_ch, end_ch, direction, crew_id, project_id, is_active, crews(name)")
+    .select("id, name, scope, app_id, start_ch, end_ch, direction, crew_id, project_id, is_active, show_in_portfolio, crews(name)")
     .order("name");
   if (!includeInactive) {
     secQuery = secQuery.eq("is_active", true);

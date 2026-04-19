@@ -26,6 +26,7 @@ export type SectionListRow = {
   crew_id: string | null;
   project_id?: string | null;
   is_active: boolean;
+  show_in_portfolio: boolean;
   crew_name: string | null;
   admin_count: number;
   subsections: SubsectionListRow[];
@@ -450,6 +451,7 @@ type SectionPayload = {
   direction: string | null;
   crew_id: string | null;
   is_active?: boolean;
+  show_in_portfolio?: boolean;
 };
 
 function parseOptionalNumberField(raw: string): number | null | "invalid" {
@@ -486,6 +488,7 @@ function SectionForm({
   const [endCh, setEndCh] = useState(initial?.end_ch != null ? String(initial.end_ch) : "");
   const [direction, setDirection] = useState(initial?.direction ?? "");
   const [isActive, setIsActive] = useState(initial?.is_active !== false);
+  const [showInPortfolio, setShowInPortfolio] = useState(initial?.show_in_portfolio !== false);
   const [localError, setLocalError] = useState<string | null>(null);
 
   const displayError = error ?? localError;
@@ -511,7 +514,7 @@ function SectionForm({
           end_ch: ec,
           direction: direction === "" ? null : direction,
           crew_id: crewId === "" ? null : crewId,
-          ...(isEdit ? { is_active: isActive } : {}),
+          ...(isEdit ? { is_active: isActive, show_in_portfolio: showInPortfolio } : {}),
         });
       }}
     >
@@ -600,6 +603,16 @@ function SectionForm({
         <label className="flex cursor-pointer items-center gap-2 text-xs" style={{ color: "#52525b" }}>
           <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
           Active
+        </label>
+      )}
+      {isEdit && (
+        <label className="flex cursor-pointer items-center gap-2 text-xs" style={{ color: "#52525b" }}>
+          <input
+            type="checkbox"
+            checked={showInPortfolio}
+            onChange={(e) => setShowInPortfolio(e.target.checked)}
+          />
+          Show in portfolio
         </label>
       )}
       {displayError && <p className="text-xs text-red-600">{displayError}</p>}

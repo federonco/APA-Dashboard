@@ -72,6 +72,7 @@ type PatchSectionBody = {
   direction?: unknown;
   crew_id?: unknown;
   is_active?: unknown;
+  show_in_portfolio?: unknown;
 };
 
 export async function PATCH(
@@ -136,6 +137,10 @@ export async function PATCH(
 
   if (body.is_active !== undefined) {
     updates.is_active = Boolean(body.is_active);
+  }
+
+  if (body.show_in_portfolio !== undefined) {
+    updates.show_in_portfolio = Boolean(body.show_in_portfolio);
   }
 
   if (Object.keys(updates).length === 0) {

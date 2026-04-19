@@ -1,6 +1,5 @@
 @import "tailwindcss";
-/* Bare "tw-animate-css" fails: Tailwind resolves from app/ — use explicit path */
-@import "../node_modules/tw-animate-css/dist/tw-animate.css";
+@import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "../node_modules/@svar-ui/react-gantt/dist/index.css";
 

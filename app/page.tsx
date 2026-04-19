@@ -7,7 +7,9 @@ import {
   getSectionsForCrew,
   getDrainerSubsectionsForCrew,
   getAggregatedSectionProgress,
+  getSectionChainageProgress,
   type SectionProgressScope,
+  type SectionProgressData,
 } from "@/lib/queries/daily";
 import { getSpreadsheetData } from "@/lib/queries/spreadsheet";
 import { Header } from "@/components/dashboard/Header";
@@ -18,6 +20,8 @@ import { MonthlyProgressChart } from "@/components/dashboard/MonthlyProgressChar
 import { WaterConsumptionChart } from "@/components/dashboard/WaterConsumptionChart";
 import { PlannerGanttCard } from "@/components/dashboard/PlannerGanttCard";
 import { DaySelector } from "@/components/dashboard/DaySelector";
+import { SectionPortfolioView } from "@/components/dashboard/SectionPortfolioView";
+import { LagMonitor } from "@/components/dashboard/LagMonitor";
 import { tokens } from "@/lib/designTokens";
 import { toWorkingDay } from "@/lib/utils/workingDays";
 import { SpreadsheetMode } from "@/components/dashboard/SpreadsheetMode";
@@ -75,6 +79,19 @@ export default async function Page({ searchParams }: Props) {
 
   const sections = crewId ? await getSectionsForCrew(crewId) : [];
   const subsections = crewId ? await getDrainerSubsectionsForCrew(crewId) : [];
+
+  const perSectionProgress: Record<string, SectionProgressData> = {};
+  if (crewId && sections.length > 0) {
+    const results = await Promise.all(
+      sections.map((s) =>
+        getSectionChainageProgress(s.id).then((p) => ({ id: s.id, p }))
+      )
+    );
+    for (const { id, p } of results) {
+      if (p) perSectionProgress[id] = p;
+    }
+  }
+
   const defaultScopes: SectionProgressScope[] = sections.map((s) => ({
     sectionId: s.id,
     ranges: null,
@@ -110,6 +127,12 @@ export default async function Page({ searchParams }: Props) {
         ) : (
           <>
             <DaySelector currentDate={rawDate} />
+            <SectionPortfolioView
+              sections={sections}
+              progress={perSectionProgress}
+              crewCode={crewForQueries}
+            />
+            <LagMonitor sections={sections} progress={perSectionProgress} />
             <MetricCardsDisplay date={selectedDate} />
             <SectionProgress
               sections={sections}

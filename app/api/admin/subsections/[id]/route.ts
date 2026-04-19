@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAdminClient } from "@/lib/supabase/admin";
 import { isSuperAdmin } from "@/lib/auth";
 
-async function requireSuperAdminUser() {
+async function requireSuper() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -14,63 +14,18 @@ async function requireSuperAdminUser() {
   return user;
 }
 
-export async function GET(
-  _req: Request,
-  ctx: { params: Promise<{ id: string }> }
-) {
-  const auth = await requireSuperAdminUser();
-  if (!auth) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { id } = await ctx.params;
-  if (!id) {
-    return NextResponse.json({ error: "Missing id" }, { status: 400 });
-  }
-
-  const admin = requireAdminClient();
-  const { data: section, error } = await admin
-    .from("sections")
-    .select("id, name, scope, start_ch, end_ch, direction, crew_id, crews(name)")
-    .eq("id", id)
-    .maybeSingle();
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-  if (!section) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  const { data: admins } = await admin
-    .from("user_app_roles")
-    .select("user_id, user_email, role")
-    .eq("section_id", id)
-    .eq("role", "section_admin");
-
-  return NextResponse.json({
-    section: {
-      ...section,
-      crew_name: (section as { crews?: { name?: string | null } }).crews?.name ?? null,
-    },
-    admins: admins ?? [],
-  });
-}
-
 function parseNum(v: unknown): number | null {
   if (v === null || v === undefined || v === "") return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
 
-type PatchSectionBody = {
+type PatchSubsectionBody = {
   name?: unknown;
-  scope?: unknown;
   app_id?: unknown;
   start_ch?: unknown;
   end_ch?: unknown;
   direction?: unknown;
-  crew_id?: unknown;
   is_active?: unknown;
 };
 
@@ -78,8 +33,8 @@ export async function PATCH(
   req: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
-  const auth = await requireSuperAdminUser();
-  if (!auth) {
+  const u = await requireSuper();
+  if (!u) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -88,9 +43,9 @@ export async function PATCH(
     return NextResponse.json({ error: "Missing id" }, { status: 400 });
   }
 
-  let body: PatchSectionBody;
+  let body: PatchSubsectionBody;
   try {
-    body = (await req.json()) as PatchSectionBody;
+    body = (await req.json()) as PatchSubsectionBody;
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
@@ -104,21 +59,12 @@ export async function PATCH(
     updates.name = body.name.trim();
   }
 
-  if (body.scope !== undefined) {
-    const scope = body.scope === "app" ? "app" : "shared";
-    updates.scope = scope;
-    if (scope === "shared") {
-      updates.app_id = null;
-    } else {
-      const aid = typeof body.app_id === "string" ? body.app_id.trim() : "";
-      if (!aid) {
-        return NextResponse.json({ error: "app_id is required when scope is app" }, { status: 400 });
-      }
-      updates.app_id = aid;
-    }
-  } else if (body.app_id !== undefined) {
+  if (body.app_id !== undefined) {
     const aid = typeof body.app_id === "string" ? body.app_id.trim() : "";
-    updates.app_id = aid === "" ? null : aid;
+    if (!aid) {
+      return NextResponse.json({ error: "app_id cannot be empty" }, { status: 400 });
+    }
+    updates.app_id = aid;
   }
 
   if (body.start_ch !== undefined) updates.start_ch = parseNum(body.start_ch);
@@ -127,11 +73,6 @@ export async function PATCH(
   if (body.direction !== undefined) {
     const d = typeof body.direction === "string" ? body.direction.trim() : "";
     updates.direction = d === "onwards" || d === "backwards" ? d : null;
-  }
-
-  if (body.crew_id !== undefined) {
-    updates.crew_id =
-      typeof body.crew_id === "string" && body.crew_id.trim() !== "" ? body.crew_id.trim() : null;
   }
 
   if (body.is_active !== undefined) {
@@ -144,10 +85,10 @@ export async function PATCH(
 
   const admin = requireAdminClient();
   const { data, error } = await admin
-    .from("sections")
+    .from("subsections")
     .update(updates)
     .eq("id", id)
-    .select("id, name, scope, app_id, start_ch, end_ch, direction, crew_id, project_id, is_active, crews(name)")
+    .select("id, name, section_id, app_id, start_ch, end_ch, direction, is_active")
     .maybeSingle();
 
   if (error) {
@@ -157,8 +98,29 @@ export async function PATCH(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  return NextResponse.json({
-    ...data,
-    crew_name: (data as { crews?: { name?: string | null } }).crews?.name ?? null,
-  });
+  return NextResponse.json(data);
+}
+
+export async function DELETE(
+  _req: NextRequest,
+  ctx: { params: Promise<{ id: string }> }
+) {
+  const u = await requireSuper();
+  if (!u) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await ctx.params;
+  if (!id) {
+    return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  }
+
+  const admin = requireAdminClient();
+  const { error } = await admin.from("subsections").delete().eq("id", id);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true });
 }

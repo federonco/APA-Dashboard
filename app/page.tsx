@@ -21,7 +21,6 @@ import { WaterConsumptionChart } from "@/components/dashboard/WaterConsumptionCh
 import { PlannerGanttCard } from "@/components/dashboard/PlannerGanttCard";
 import { DaySelector } from "@/components/dashboard/DaySelector";
 import { SectionPortfolioView } from "@/components/dashboard/SectionPortfolioView";
-import { LagMonitor } from "@/components/dashboard/LagMonitor";
 import { tokens } from "@/lib/designTokens";
 import { toWorkingDay } from "@/lib/utils/workingDays";
 import { SpreadsheetMode } from "@/components/dashboard/SpreadsheetMode";
@@ -132,7 +131,6 @@ export default async function Page({ searchParams }: Props) {
               progress={perSectionProgress}
               crewCode={crewForQueries}
             />
-            <LagMonitor sections={sections} progress={perSectionProgress} />
             <MetricCardsDisplay date={selectedDate} />
             <SectionProgress
               sections={sections}

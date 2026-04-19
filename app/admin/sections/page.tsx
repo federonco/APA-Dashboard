@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Fragment } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdminClient } from "@/lib/supabase/admin";
@@ -23,6 +24,39 @@ export default async function AdminSectionsPage() {
     .select("id, name, scope, start_ch, end_ch, direction, crew_id, crews(name)")
     .eq("is_active", true)
     .order("name");
+
+  const { data: subsectionRows } = await admin
+    .from("subsections")
+    .select("id, name, section_id, app_id, start_ch, end_ch, direction")
+    .eq("is_active", true)
+    .order("name");
+
+  const subsectionsBySection = new Map<
+    string,
+    {
+      id: string;
+      name: string;
+      section_id: string;
+      app_id: string;
+      start_ch: number | null;
+      end_ch: number | null;
+      direction: string | null;
+    }[]
+  >();
+  for (const raw of subsectionRows ?? []) {
+    const r = raw as {
+      id: string;
+      name: string;
+      section_id: string;
+      app_id: string;
+      start_ch: number | null;
+      end_ch: number | null;
+      direction: string | null;
+    };
+    const list = subsectionsBySection.get(r.section_id) ?? [];
+    list.push(r);
+    subsectionsBySection.set(r.section_id, list);
+  }
 
   if (error) {
     return (
@@ -93,24 +127,54 @@ export default async function AdminSectionsPage() {
           <tbody>
             {rows.map((s) => {
               const crewName = (s as { crews?: { name?: string | null } }).crews?.name ?? "—";
+              const nested = subsectionsBySection.get(s.id) ?? [];
               return (
-                <tr key={s.id} className="border-b transition-colors hover:bg-[#fafafa]" style={{ borderColor: "#EEECEF" }}>
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/admin/sections/${s.id}`}
-                      className="font-medium hover:underline"
-                      style={{ color: "#B96A2D" }}
+                <Fragment key={s.id}>
+                  <tr className="border-b transition-colors hover:bg-[#fafafa]" style={{ borderColor: "#EEECEF" }}>
+                    <td className="px-4 py-3">
+                      <Link
+                        href={`/admin/sections/${s.id}`}
+                        className="font-medium hover:underline"
+                        style={{ color: "#B96A2D" }}
+                      >
+                        {s.name}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 text-xs">{s.scope ?? "—"}</td>
+                    <td className="px-4 py-3 text-xs">{crewName}</td>
+                    <td className="px-4 py-3 text-xs">{counts.get(s.id) ?? 0}</td>
+                    <td className="px-4 py-3 text-xs" style={{ color: "#71717a" }}>
+                      {chainage(s)}
+                    </td>
+                  </tr>
+                  {nested.map((sub) => (
+                    <tr
+                      key={sub.id}
+                      className="border-b bg-[#fafafa]/80 transition-colors hover:bg-[#f4f4f5]"
+                      style={{ borderColor: "#EEECEF" }}
                     >
-                      {s.name}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-xs">{s.scope ?? "—"}</td>
-                  <td className="px-4 py-3 text-xs">{crewName}</td>
-                  <td className="px-4 py-3 text-xs">{counts.get(s.id) ?? 0}</td>
-                  <td className="px-4 py-3 text-xs" style={{ color: "#71717a" }}>
-                    {chainage(s)}
-                  </td>
-                </tr>
+                      <td className="px-4 py-2 pl-8 text-xs" style={{ color: "#52525b" }}>
+                        <span className="mr-1 select-none text-[#a1a1aa]">└</span>
+                        <span className="font-medium">{sub.name}</span>
+                        <span className="ml-2 text-[11px] text-[#a1a1aa]">({sub.app_id})</span>
+                        <Link
+                          href="/admin/cards"
+                          className="ml-3 text-[11px] font-medium hover:underline"
+                          style={{ color: "#B96A2D" }}
+                          title="Tarjetas del dashboard que pueden filtrar por esta subsection"
+                        >
+                          cards
+                        </Link>
+                      </td>
+                      <td className="px-4 py-2 text-xs">—</td>
+                      <td className="px-4 py-2 text-xs">—</td>
+                      <td className="px-4 py-2 text-xs">—</td>
+                      <td className="px-4 py-2 text-xs" style={{ color: "#71717a" }}>
+                        {chainage(sub)}
+                      </td>
+                    </tr>
+                  ))}
+                </Fragment>
               );
             })}
           </tbody>

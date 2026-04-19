@@ -174,22 +174,27 @@ export async function resolveUnifiedSectionIdForDrainer(
   if (!hasSupabaseEnv()) return null;
   const supabase = createAdminClient();
   if (!supabase) return null;
-  const { data: direct } = await supabase
+
+  const { data: asUnified } = await supabase
     .from("sections")
     .select("id")
     .eq("id", drainerSectionId)
     .maybeSingle();
-  if (direct?.id) return direct.id;
-  const { data: byLegacy } = await supabase
+  if (asUnified?.id) return asUnified.id;
+
+  const { data: viaSectionLegacy } = await supabase
     .from("sections")
-    .select("id, app_config")
-    .not("app_config", "is", null);
-  for (const row of byLegacy ?? []) {
-    const cfg = row.app_config as Record<string, unknown> | null;
-    if (cfg && String(cfg.legacy_id ?? "") === drainerSectionId) {
-      return (row as { id: string }).id;
-    }
-  }
+    .select("id")
+    .eq("app_config->>legacy_id", drainerSectionId)
+    .maybeSingle();
+  if (viaSectionLegacy?.id) return viaSectionLegacy.id;
+
+  const { data: viaSubLegacy } = await supabase
+    .from("subsections")
+    .select("section_id")
+    .eq("app_config->>legacy_id", drainerSectionId)
+    .maybeSingle();
+  if (viaSubLegacy?.section_id) return String(viaSubLegacy.section_id);
 
   // Fallback: unified `sections` row whose name matches this drainer (subsections hang off `sections`).
   const { data: drRow } = await supabase
@@ -233,6 +238,7 @@ export async function getDrainerSubsectionsForCrew(
       .eq("crew_id", crewId);
     if (de) throw de;
     const out: DrainerSubsectionInfo[] = [];
+    const seenSubsectionIds = new Set<string>();
     for (const d of drainers ?? []) {
       const drainerId = (d as { id: string }).id;
       const unifiedId = await resolveUnifiedSectionIdForDrainer(drainerId);
@@ -244,11 +250,14 @@ export async function getDrainerSubsectionsForCrew(
         .order("name");
       if (se) continue;
       for (const s of subs ?? []) {
+        const subId = (s as { id: string }).id;
+        if (seenSubsectionIds.has(subId)) continue;
+        seenSubsectionIds.add(subId);
         const a = Number((s as { start_ch?: unknown }).start_ch);
         const b = Number((s as { end_ch?: unknown }).end_ch);
         if (Number.isNaN(a) || Number.isNaN(b)) continue;
         out.push({
-          id: (s as { id: string }).id,
+          id: subId,
           name: String((s as { name?: string }).name ?? "Subsection"),
           startCh: a,
           endCh: b,

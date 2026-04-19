@@ -31,6 +31,39 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  const { data: subsectionRows } = await admin
+    .from("subsections")
+    .select("id, name, section_id, app_id, start_ch, end_ch, direction, is_active")
+    .eq("is_active", true)
+    .order("name");
+
+  const subsectionsBySection = new Map<
+    string,
+    {
+      id: string;
+      name: string;
+      section_id: string;
+      app_id: string;
+      start_ch: number | null;
+      end_ch: number | null;
+      direction: string | null;
+    }[]
+  >();
+  for (const raw of subsectionRows ?? []) {
+    const r = raw as {
+      id: string;
+      name: string;
+      section_id: string;
+      app_id: string;
+      start_ch: number | null;
+      end_ch: number | null;
+      direction: string | null;
+    };
+    const list = subsectionsBySection.get(r.section_id) ?? [];
+    list.push(r);
+    subsectionsBySection.set(r.section_id, list);
+  }
+
   const { data: roleRows } = await admin
     .from("user_app_roles")
     .select("section_id")
@@ -48,6 +81,7 @@ export async function GET() {
     ...s,
     admin_count: counts.get(s.id) ?? 0,
     crew_name: (s as { crews?: { name?: string | null } }).crews?.name ?? null,
+    subsections: subsectionsBySection.get(s.id) ?? [],
   }));
 
   return NextResponse.json(rows);

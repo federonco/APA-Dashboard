@@ -29,25 +29,83 @@ function monthBoundsPerth(anchorDate: string): { start: string; end: string } {
   };
 }
 
+/** How to filter `drainer_pipe_records` for dashboard metrics (pipes / welds). */
+export type DrainerPipeScope =
+  | { mode: "legacy_section_id"; value: string }
+  | { mode: "subsection_id"; value: string }
+  | { mode: "unified_section_id"; value: string };
+
+/**
+ * Resolves how to query `drainer_pipe_records` for a dashboard card.
+ * - Subsection cards: prefer legacy `section_id` (drainer_sections PK) from `subsections.app_config` when present;
+ *   otherwise filter by `subsection_id`.
+ * - Section-only cards: only pipes on that section's legacy drainer row (no rollup of child subsections).
+ */
+export async function resolveDrainerScopeForCard(
+  admin: SupabaseClient,
+  cardConfig: { sectionId: string | null; subsectionId: string | null }
+): Promise<DrainerPipeScope | null> {
+  const { sectionId, subsectionId } = cardConfig;
+
+  if (subsectionId) {
+    const { data: sub, error } = await admin
+      .from("subsections")
+      .select("app_config")
+      .eq("id", subsectionId)
+      .maybeSingle();
+    if (error || !sub) return null;
+    const cfg = (sub as { app_config?: Record<string, unknown> | null }).app_config;
+    const leg = cfg?.legacy_id;
+    if (leg != null && String(leg).trim() !== "") {
+      return { mode: "legacy_section_id", value: String(leg) };
+    }
+    return { mode: "subsection_id", value: subsectionId };
+  }
+
+  if (!sectionId) return null;
+
+  const { data: drDirect } = await admin
+    .from("drainer_sections")
+    .select("id")
+    .eq("id", sectionId)
+    .maybeSingle();
+  if (drDirect?.id) {
+    return { mode: "legacy_section_id", value: sectionId };
+  }
+
+  const { data: sec } = await admin
+    .from("sections")
+    .select("app_config")
+    .eq("id", sectionId)
+    .maybeSingle();
+  const cfg = sec?.app_config as Record<string, unknown> | null;
+  const leg = cfg?.legacy_id;
+  if (leg != null && String(leg).trim() !== "") {
+    return { mode: "legacy_section_id", value: String(leg) };
+  }
+
+  return null;
+}
+
+function applyDrainerPipeScope<T extends { eq: (c: string, v: string) => T }>(
+  q: T,
+  scope: DrainerPipeScope
+): T {
+  if (scope.mode === "legacy_section_id") return q.eq("section_id", scope.value);
+  if (scope.mode === "subsection_id") return q.eq("subsection_id", scope.value);
+  return q.eq("unified_section_id", scope.value);
+}
+
+/** @deprecated Prefer `resolveDrainerScopeForCard` for metrics; kept for callers that only have a unified section id. */
 export async function resolveDrainerSectionId(
   admin: SupabaseClient,
   unifiedSectionId: string
 ): Promise<string | null> {
-  const { data: direct } = await admin
-    .from("drainer_sections")
-    .select("id")
-    .eq("id", unifiedSectionId)
-    .maybeSingle();
-  if (direct?.id) return direct.id;
-
-  const { data: row } = await admin.from("sections").select("app_config").eq("id", unifiedSectionId).maybeSingle();
-  const cfg = row?.app_config as Record<string, unknown> | null;
-  const legacy = cfg?.legacy_id;
-  if (legacy != null && String(legacy).length > 0) {
-    const lid = String(legacy);
-    const { data: ds } = await admin.from("drainer_sections").select("id").eq("id", lid).maybeSingle();
-    if (ds?.id) return ds.id;
-  }
+  const scope = await resolveDrainerScopeForCard(admin, {
+    sectionId: unifiedSectionId,
+    subsectionId: null,
+  });
+  if (scope?.mode === "legacy_section_id") return scope.value;
   return null;
 }
 
@@ -93,60 +151,46 @@ export async function computeMetricValue(
   if (!admin) return 0;
 
   const { sectionId, subsectionId, crewId, dateStr } = opts;
-  const drainerSid = sectionId ? await resolveDrainerSectionId(admin, sectionId) : null;
-  const chainageRange =
-    subsectionId && drainerSid ? await getSubsectionChainageRange(admin, subsectionId) : null;
 
-  if (
-    subsectionId &&
-    (metricKey === "pipes_today" || metricKey === "pipes_this_month" || metricKey === "pipes_total") &&
-    !chainageRange
-  ) {
-    return 0;
-  }
+  const pipeScope =
+    metricKey === "pipes_today" ||
+    metricKey === "pipes_this_month" ||
+    metricKey === "pipes_total" ||
+    metricKey === "welds_required"
+      ? await resolveDrainerScopeForCard(admin, { sectionId, subsectionId })
+      : null;
 
   switch (metricKey) {
     case "pipes_today": {
-      if (!drainerSid) return 0;
+      if (!pipeScope) return 0;
       let q = admin
         .from("drainer_pipe_records")
         .select("id", { count: "exact", head: true })
-        .eq("section_id", drainerSid)
         .eq("date_installed", dateStr);
-      if (chainageRange) {
-        q = q.gte("chainage", chainageRange.min).lte("chainage", chainageRange.max);
-      }
+      q = applyDrainerPipeScope(q, pipeScope);
       const { count, error } = await q;
       if (error) throw error;
       return count ?? 0;
     }
     case "pipes_this_month": {
-      if (!drainerSid) return 0;
+      if (!pipeScope) return 0;
       const { start, end } = monthBoundsPerth(dateStr);
       const d0 = start.split("T")[0];
       const d1 = end.split("T")[0];
       let q = admin
         .from("drainer_pipe_records")
         .select("id", { count: "exact", head: true })
-        .eq("section_id", drainerSid)
         .gte("date_installed", d0)
         .lte("date_installed", d1);
-      if (chainageRange) {
-        q = q.gte("chainage", chainageRange.min).lte("chainage", chainageRange.max);
-      }
+      q = applyDrainerPipeScope(q, pipeScope);
       const { count, error } = await q;
       if (error) throw error;
       return count ?? 0;
     }
     case "pipes_total": {
-      if (!drainerSid) return 0;
-      let q = admin
-        .from("drainer_pipe_records")
-        .select("id", { count: "exact", head: true })
-        .eq("section_id", drainerSid);
-      if (chainageRange) {
-        q = q.gte("chainage", chainageRange.min).lte("chainage", chainageRange.max);
-      }
+      if (!pipeScope) return 0;
+      let q = admin.from("drainer_pipe_records").select("id", { count: "exact", head: true });
+      q = applyDrainerPipeScope(q, pipeScope);
       const { count, error } = await q;
       if (error) throw error;
       return count ?? 0;
@@ -197,12 +241,13 @@ export async function computeMetricValue(
       return count ?? 0;
     }
     case "welds_required": {
-      if (!drainerSid) return 0;
-      const { count, error } = await admin
+      if (!pipeScope) return 0;
+      let q = admin
         .from("drainer_pipe_records")
         .select("id", { count: "exact", head: true })
-        .eq("section_id", drainerSid)
         .eq("joint_type", "WR");
+      q = applyDrainerPipeScope(q, pipeScope);
+      const { count, error } = await q;
       if (error) throw error;
       return count ?? 0;
     }

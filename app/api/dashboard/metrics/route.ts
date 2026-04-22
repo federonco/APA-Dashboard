@@ -36,6 +36,7 @@ export async function GET(req: NextRequest) {
     section_name: string | null;
     subsection_name: string | null;
     crew_name: string | null;
+    is_visible: boolean;
   }[] = [];
 
   for (const c of cards ?? []) {

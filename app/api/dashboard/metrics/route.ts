@@ -10,13 +10,19 @@ function perthToday(): string {
 
 export async function GET(req: NextRequest) {
   const date = req.nextUrl.searchParams.get("date")?.trim() || perthToday();
+  const adminMode = req.nextUrl.searchParams.get("admin_mode") === "1";
   const admin = requireAdminClient();
 
-  const { data: cards, error } = await admin
+  let query = admin
     .from("dashboard_cards")
     .select("id, metric_key, section_id, subsection_id, crew_id, label, sort_order, is_visible")
-    .eq("is_visible", true)
     .order("sort_order", { ascending: true });
+
+  if (!adminMode) {
+    query = query.eq("is_visible", true);
+  }
+
+  const { data: cards, error } = await query;
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -40,6 +46,7 @@ export async function GET(req: NextRequest) {
       subsection_id: string | null;
       crew_id: string | null;
       label: string;
+      is_visible: boolean;
     };
     const cat = catalogueEntry(row.metric_key);
     if (!cat) continue;
@@ -76,6 +83,7 @@ export async function GET(req: NextRequest) {
         section_name: sectionName,
         subsection_name: subsectionName,
         crew_name: crewName,
+        is_visible: row.is_visible,
       });
     } catch {
       rows.push({
@@ -86,6 +94,7 @@ export async function GET(req: NextRequest) {
         section_name: sectionName,
         subsection_name: subsectionName,
         crew_name: crewName,
+        is_visible: row.is_visible,
       });
     }
   }

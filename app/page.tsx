@@ -40,6 +40,7 @@ export default async function Page({ searchParams }: Props) {
   const params = await searchParams;
   const crew = (params?.crew as string) || "A";
   const view = (params?.view as string) || "dashboard";
+  const adminMode = (params?.admin as string) === "1";
   const rawDate =
     (params?.date as string) ||
     new Date().toLocaleDateString("en-CA", { timeZone: "Australia/Perth" });
@@ -131,7 +132,7 @@ export default async function Page({ searchParams }: Props) {
               progress={perSectionProgress}
               crewCode={crewForQueries}
             />
-            <MetricCardsDisplay date={selectedDate} />
+            <MetricCardsDisplay date={selectedDate} adminMode={adminMode} />
             <SectionProgress
               sections={sections}
               subsections={subsections}

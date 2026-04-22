@@ -1,5 +1,6 @@
 import type { SectionInfo, SectionProgressData } from "@/lib/queries/daily";
 import { tokens } from "@/lib/designTokens";
+import { PIPE_LENGTH_M } from "@/lib/constants";
 
 export interface SectionPortfolioViewProps {
   sections: SectionInfo[];
@@ -27,7 +28,17 @@ export function SectionPortfolioView({ sections, progress, crewCode }: SectionPo
         const p = progress[section.id];
         if (!p) return null;
 
-        const pct = Math.min(100, Math.max(0, p.percent));
+        const defaultPct = Math.min(100, Math.max(0, p.percent));
+        const isSection41 = section.name.trim().toLowerCase() === "section 4.1";
+        const plannedPipes =
+          Math.abs(section.endCh - section.startCh) > 0
+            ? Math.ceil(Math.abs(section.endCh - section.startCh) / PIPE_LENGTH_M)
+            : 0;
+        const pctByPipes =
+          plannedPipes > 0
+            ? Math.min(100, Math.max(0, Math.round((p.pipeCount / plannedPipes) * 100)))
+            : defaultPct;
+        const pct = isSection41 ? pctByPipes : defaultPct;
         let badge: { label: string; emoji: string };
         if (p.pipeCount === 0) {
           badge = { label: "Not started", emoji: "⚪" };
@@ -102,7 +113,7 @@ export function SectionPortfolioView({ sections, progress, crewCode }: SectionPo
                 </dd>
               </div>
               <div className="flex justify-between gap-2">
-                <dt style={{ color: tokens.text.muted }}>Backfill front</dt>
+                <dt style={{ color: tokens.text.muted }}>Backfill records up to</dt>
                 <dd className="font-medium tabular-nums" style={{ color: tokens.charts.backfill }}>
                   {p.pspLodgedUpToChainage != null ? formatCh(p.pspLodgedUpToChainage) : "—"}
                 </dd>

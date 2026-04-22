@@ -7,17 +7,22 @@ import { tokens } from "@/lib/designTokens";
 
 const POLL_MS = 60_000;
 
-export function MetricCardsDisplay({ date }: { date: string }) {
+type CardFilter = "visible" | "hidden" | "all";
+
+export function MetricCardsDisplay({ date, adminMode = false }: { date: string; adminMode?: boolean }) {
   const [cards, setCards] = useState<MetricCardData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<CardFilter>("visible");
 
   const load = useCallback(
     async (silent = false) => {
       if (!silent) setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`/api/dashboard/metrics?date=${encodeURIComponent(date)}`);
+        const params = new URLSearchParams({ date });
+        if (adminMode) params.set("admin_mode", "1");
+        const res = await fetch(`/api/dashboard/metrics?${params.toString()}`);
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data?.error ?? "Failed to load metrics");
         setCards(data.cards ?? []);
@@ -27,7 +32,7 @@ export function MetricCardsDisplay({ date }: { date: string }) {
         if (!silent) setLoading(false);
       }
     },
-    [date]
+    [adminMode, date]
   );
 
   useEffect(() => {
@@ -39,9 +44,27 @@ export function MetricCardsDisplay({ date }: { date: string }) {
     return () => window.clearInterval(id);
   }, [load]);
 
+  const filteredCards = cards.filter((card) => {
+    if (!adminMode || filter === "all") return true;
+    if (filter === "hidden") return card.is_visible === false;
+    return card.is_visible !== false;
+  });
+
   return (
     <div className="relative mb-4">
       <div className="mb-2 flex items-center justify-end gap-2">
+        {adminMode && (
+          <select
+            className="h-8 rounded-md border border-zinc-200 bg-white px-2.5 text-xs font-medium text-zinc-700"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value as CardFilter)}
+            aria-label="Card visibility filter"
+          >
+            <option value="visible">Visible</option>
+            <option value="hidden">Hidden</option>
+            <option value="all">All</option>
+          </select>
+        )}
         <button
           type="button"
           className="inline-flex h-8 items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-2.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
@@ -66,16 +89,18 @@ export function MetricCardsDisplay({ date }: { date: string }) {
             />
           ))}
         </div>
-      ) : cards.length === 0 ? (
+      ) : filteredCards.length === 0 ? (
         <div
           className="rounded-lg border border-dashed border-zinc-300 px-4 py-8 text-center text-sm"
           style={{ color: tokens.text.muted }}
         >
-          No cards configured. Admins can add cards from the admin panel (Dashboard cards).
+          {adminMode
+            ? "No cards for the selected filter."
+            : "No cards configured. Admins can add cards from the admin panel (Dashboard cards)."}
         </div>
       ) : (
         <div className="flex flex-wrap gap-3">
-          {cards.map((c) => (
+          {filteredCards.map((c) => (
             <MetricCardItem key={c.id} card={c} />
           ))}
         </div>

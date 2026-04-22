@@ -298,8 +298,7 @@ export type SectionProgressScope = {
 
 async function getPspLocationIdsForSection(
   supabase: NonNullable<ReturnType<typeof createAdminClient>>,
-  sectionId: string,
-  crewId: string | null
+  sectionId: string
 ): Promise<string[]> {
   // Prefer direct section mapping when schema has it.
   const bySection = await supabase
@@ -320,15 +319,7 @@ async function getPspLocationIdsForSection(
       return (byDrainerSection.data ?? []).map((r) => r.id);
     }
   }
-  // Fallback to crew-scoped PSP locations.
-  if (!crewId) return [];
-  const byCrew = await supabase
-    .from("locations")
-    .select("id")
-    .eq("location_type", "psp")
-    .eq("crew_id", crewId);
-  if (byCrew.error) return [];
-  return (byCrew.data ?? []).map((r) => r.id);
+  return [];
 }
 
 export async function getSectionsForCrew(crewId: string | null): Promise<SectionInfo[]> {
@@ -376,7 +367,6 @@ async function computeSectionChainageProgress(
   const startCh = Number(section.start_ch) || 0;
   const endCh = Number(section.end_ch) || 0;
   const direction = section.direction === "backwards";
-  const crewId = (section as { crew_id?: string | null }).crew_id ?? null;
   const totalSectionLength = Math.abs(startCh - endCh);
   if (totalSectionLength <= 0) return null;
 
@@ -458,25 +448,38 @@ async function computeSectionChainageProgress(
   const avgPipesPerDay =
     workedDays > 0 ? Math.round((pipes.length / workedDays) * 10) / 10 : 0;
 
-  const pspLocationIds = await getPspLocationIdsForSection(supabase, sectionId, crewId);
   let pspLodgedUpToChainage: number | null = null;
-  if (pspLocationIds.length > 0) {
-    const { data: pspRows } = await supabase
+  let pspChainages: number[] = [];
+  const unifiedSectionId = await resolveUnifiedSectionIdForDrainer(sectionId);
+  if (unifiedSectionId) {
+    const { data: pspRowsByUnified } = await supabase
       .from("psp_records")
-      .select("chainage, location_id")
-      .in("location_id", pspLocationIds)
+      .select("chainage")
+      .eq("unified_section_id", unifiedSectionId)
       .not("chainage", "is", null);
-    let pspChainages = (pspRows ?? [])
+    pspChainages = (pspRowsByUnified ?? [])
       .map((r) => Number((r as { chainage?: unknown }).chainage))
       .filter((n) => !isNaN(n));
-    if (mergedScopes && mergedScopes.length > 0) {
-      pspChainages = pspChainages.filter((ch) => chainageInRanges(ch, mergedScopes));
+  } else {
+    const pspLocationIds = await getPspLocationIdsForSection(supabase, sectionId);
+    if (pspLocationIds.length > 0) {
+      const { data: pspRowsByLocation } = await supabase
+        .from("psp_records")
+        .select("chainage, location_id")
+        .in("location_id", pspLocationIds)
+        .not("chainage", "is", null);
+      pspChainages = (pspRowsByLocation ?? [])
+        .map((r) => Number((r as { chainage?: unknown }).chainage))
+        .filter((n) => !isNaN(n));
     }
-    if (pspChainages.length > 0) {
-      pspLodgedUpToChainage = direction
-        ? Math.min(...pspChainages)
-        : Math.max(...pspChainages);
-    }
+  }
+  if (mergedScopes && mergedScopes.length > 0) {
+    pspChainages = pspChainages.filter((ch) => chainageInRanges(ch, mergedScopes));
+  }
+  if (pspChainages.length > 0) {
+    pspLodgedUpToChainage = direction
+      ? Math.min(...pspChainages)
+      : Math.max(...pspChainages);
   }
 
   return {

@@ -14,7 +14,10 @@ export function Header({ crew }: Props) {
   const view = searchParams.get("view") ?? "dashboard";
   const isSpreadsheet = view === "spreadsheet";
 
-  const toggleUrl = `/?crew=${crew}&view=${isSpreadsheet ? "dashboard" : "spreadsheet"}`;
+  const toggleViewParams = new URLSearchParams(searchParams.toString());
+  toggleViewParams.set("crew", crew);
+  toggleViewParams.set("view", isSpreadsheet ? "dashboard" : "spreadsheet");
+  const toggleUrl = `/?${toggleViewParams.toString()}`;
 
   const today = new Date().toLocaleDateString("en-AU", {
     weekday: "long",

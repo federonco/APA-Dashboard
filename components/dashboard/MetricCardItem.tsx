@@ -11,6 +11,7 @@ export type MetricCardData = {
   section_name: string | null;
   subsection_name?: string | null;
   crew_name: string | null;
+  is_visible?: boolean;
 };
 
 function colorStyle(metricKey: string): { border: string; accent: string } {
@@ -40,6 +41,7 @@ export function MetricCardItem({ card }: { card: MetricCardData }) {
       style={{
         background: tokens.theme.card,
         borderColor: border,
+        opacity: card.is_visible === false ? 0.65 : 1,
       }}
     >
       <div className="flex items-start justify-between gap-2">

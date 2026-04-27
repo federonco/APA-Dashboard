@@ -1,10 +1,11 @@
-import type { SectionInfo, SectionProgressData } from "@/lib/queries/daily";
+import type { SectionInfo, SectionProgressData, SectionProgressSummary } from "@/lib/queries/daily";
 import { tokens } from "@/lib/designTokens";
-import { PIPE_LENGTH_M } from "@/lib/constants";
+import { PIPE_LENGTH_M, SCHEDULE_PIPES_PER_DAY } from "@/lib/constants";
 
 export interface SectionPortfolioViewProps {
   sections: SectionInfo[];
   progress: Record<string, SectionProgressData>;
+  sectionProgress?: Record<string, SectionProgressSummary>;
   crewCode: string;
 }
 
@@ -12,7 +13,43 @@ function formatCh(value: number): string {
   return `CH ${Math.round(value)}`;
 }
 
-export function SectionPortfolioView({ sections, progress, crewCode }: SectionPortfolioViewProps) {
+const WA_PUBLIC_HOLIDAYS: Record<number, string[]> = {
+  2025: ["2025-01-01", "2025-01-27", "2025-03-03", "2025-04-18", "2025-04-21", "2025-04-25", "2025-06-02", "2025-09-29", "2025-12-25", "2025-12-26"],
+  2026: ["2026-01-01", "2026-01-26", "2026-03-02", "2026-04-03", "2026-04-06", "2026-04-27", "2026-06-01", "2026-09-28", "2026-12-25", "2026-12-28"],
+  2027: ["2027-01-01", "2027-01-26", "2027-03-01", "2027-03-26", "2027-03-29", "2027-04-26", "2027-06-07", "2027-09-27", "2027-12-27", "2027-12-28"],
+};
+
+function toDateKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function isWaNonWorkingDay(d: Date): boolean {
+  const day = d.getDay();
+  if (day === 0 || day === 6) return true;
+  const list = WA_PUBLIC_HOLIDAYS[d.getFullYear()] ?? [];
+  return list.includes(toDateKey(d));
+}
+
+function addWaWorkingDays(from: Date, days: number): Date {
+  if (days <= 0) return new Date(from);
+  const out = new Date(from);
+  let added = 0;
+  while (added < days) {
+    out.setDate(out.getDate() + 1);
+    if (!isWaNonWorkingDay(out)) added += 1;
+  }
+  return out;
+}
+
+export function SectionPortfolioView({
+  sections,
+  progress,
+  sectionProgress = {},
+  crewCode,
+}: SectionPortfolioViewProps) {
   const withProgress = sections.filter((s) => progress[s.id] != null);
   if (sections.length === 0 || withProgress.length === 0) {
     return null;
@@ -28,17 +65,34 @@ export function SectionPortfolioView({ sections, progress, crewCode }: SectionPo
         const p = progress[section.id];
         if (!p) return null;
 
+        const sectionSummary = sectionProgress[section.id];
         const defaultPct = Math.min(100, Math.max(0, p.percent));
-        const isSection41 = section.name.trim().toLowerCase() === "section 4.1";
         const plannedPipes =
           Math.abs(section.endCh - section.startCh) > 0
             ? Math.ceil(Math.abs(section.endCh - section.startCh) / PIPE_LENGTH_M)
             : 0;
-        const pctByPipes =
-          plannedPipes > 0
-            ? Math.min(100, Math.max(0, Math.round((p.pipeCount / plannedPipes) * 100)))
-            : defaultPct;
-        const pct = isSection41 ? pctByPipes : defaultPct;
+        const pct = sectionSummary ? sectionSummary.progressPct : defaultPct;
+        const estimatedPipesPerDay = p.avgPipesPerDay > 0 ? p.avgPipesPerDay : SCHEDULE_PIPES_PER_DAY;
+        const remainingPipes = Math.max(0, plannedPipes - p.pipeCount);
+        const expectedFinishData =
+          remainingPipes === 0
+            ? { label: "Expected finish: Completed", hint: "" }
+            : estimatedPipesPerDay > 0
+              ? (() => {
+                  const daysRemaining = Math.ceil(remainingPipes / estimatedPipesPerDay);
+                  const finish = addWaWorkingDays(new Date(), daysRemaining + 5);
+                  const weekOfMonth = Math.ceil(finish.getDate() / 7);
+                  const dateLabel = finish.toLocaleDateString("en-AU", {
+                    weekday: "short",
+                    day: "numeric",
+                    month: "short",
+                  });
+                  return {
+                    label: `Expected finish: Week ${weekOfMonth}, ${dateLabel}`,
+                    hint: "+5 working-day contingency; weekends & WA public holidays skipped",
+                  };
+                })()
+              : { label: "Expected finish: —", hint: "" };
         let badge: { label: string; emoji: string };
         if (p.pipeCount === 0) {
           badge = { label: "Not started", emoji: "⚪" };
@@ -106,10 +160,24 @@ export function SectionPortfolioView({ sections, progress, crewCode }: SectionPo
             </div>
 
             <dl className="grid flex-1 gap-2 text-sm" style={{ color: tokens.text.secondary }}>
+              {sectionSummary?.guideBased && sectionSummary.totalFittings != null && (
+                <div className="flex justify-between gap-2">
+                  <dt style={{ color: tokens.text.muted }}>Fittings installed</dt>
+                  <dd className="tabular-nums">
+                    {sectionSummary.pipeCount} / {sectionSummary.totalFittings}
+                  </dd>
+                </div>
+              )}
               <div className="flex justify-between gap-2">
                 <dt style={{ color: tokens.text.muted }}>Pipe front</dt>
                 <dd className="font-medium tabular-nums" style={{ color: tokens.charts.pipeLaid }}>
-                  {formatCh(p.installedChainage)}
+                  {formatCh(sectionSummary?.pipeFront ?? p.installedChainage)}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt style={{ color: tokens.text.muted }}>Finish Ch</dt>
+                <dd className="font-medium tabular-nums" style={{ color: tokens.text.secondary }}>
+                  {formatCh(p.finalChainage)}
                 </dd>
               </div>
               <div className="flex justify-between gap-2">
@@ -119,7 +187,7 @@ export function SectionPortfolioView({ sections, progress, crewCode }: SectionPo
                 </dd>
               </div>
               <div className="flex justify-between gap-2">
-                <dt style={{ color: tokens.text.muted }}>Pipes</dt>
+                <dt style={{ color: tokens.text.muted }}>Pipes / Fittings</dt>
                 <dd className="tabular-nums">{p.pipeCount}</dd>
               </div>
               <div className="flex justify-between gap-2">
@@ -129,6 +197,17 @@ export function SectionPortfolioView({ sections, progress, crewCode }: SectionPo
                 </dd>
               </div>
             </dl>
+            <div
+              style={{
+                marginTop: 4,
+                fontSize: tokens.typography.label,
+                color: tokens.text.secondary,
+                fontFamily: tokens.typography.fontFamily,
+              }}
+              title={expectedFinishData.hint || undefined}
+            >
+              {expectedFinishData.label}
+            </div>
           </article>
         );
       })}

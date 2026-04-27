@@ -136,6 +136,20 @@ export type SectionInfo = {
   direction: "onwards" | "backwards";
 };
 
+export type SectionProgressSummary = {
+  id: string;
+  name: string;
+  startCh: number;
+  endCh: number;
+  direction: "onwards" | "backwards";
+  progressPct: number;
+  pipeFront: number | null;
+  pipeCount: number;
+  isComplete: boolean;
+  guideBased?: boolean;
+  totalFittings?: number;
+};
+
 export type SectionProgressData = {
   sectionId: string;
   installedChainage: number;
@@ -341,6 +355,144 @@ export async function getSectionsForCrew(crewId: string | null): Promise<Section
     }));
   } catch (err) {
     console.error("[Dashboard] getSectionsForCrew failed:", err);
+    return [];
+  }
+}
+
+export async function getSectionProgressForCrew(
+  crewId: string | null
+): Promise<SectionProgressSummary[]> {
+  if (!hasSupabaseEnv() || !crewId) return [];
+  try {
+    const supabase = createAdminClient();
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from("drainer_sections")
+      .select("id,name,start_ch,end_ch,direction,crew_id,drainer_pipe_records(chainage)")
+      .eq("crew_id", crewId);
+    if (error) throw error;
+
+    const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
+    const resultsBySectionId = new Map<string, SectionProgressSummary>();
+
+    for (const row of data ?? []) {
+      const startCh = Number(row.start_ch) || 0;
+      const endCh = Number(row.end_ch) || 0;
+      const direction = row.direction === "backwards" ? "backwards" : "onwards";
+      const records = Array.isArray((row as { drainer_pipe_records?: unknown[] }).drainer_pipe_records)
+        ? ((row as { drainer_pipe_records?: { chainage?: unknown }[] }).drainer_pipe_records ?? [])
+        : [];
+      const chainages = records
+        .map((r) => Number(r.chainage))
+        .filter((n) => Number.isFinite(n));
+
+      let pipeFront: number | null = null;
+      let progressPct = 0;
+
+      if (chainages.length > 0 && startCh !== endCh) {
+        const denom = endCh - startCh;
+        let bestRatio = -Infinity;
+        let bestChainage: number | null = null;
+        for (const ch of chainages) {
+          const ratio = clamp01((ch - startCh) / denom);
+          if (ratio > bestRatio) {
+            bestRatio = ratio;
+            bestChainage = ch;
+          }
+        }
+        pipeFront = bestChainage;
+        progressPct = Math.round(bestRatio * 1000) / 10;
+      }
+
+      resultsBySectionId.set(row.id, {
+        id: row.id,
+        name: row.name ?? "Section",
+        startCh,
+        endCh,
+        direction,
+        progressPct,
+        pipeFront: pipeFront != null ? Math.round(pipeFront * 100) / 100 : null,
+        pipeCount: chainages.length,
+        isComplete: progressPct >= 100,
+      });
+    }
+
+    const { data: subsectionData } = await supabase
+      .from("subsections")
+      .select("id,name,section_id,start_ch,end_ch,direction,app_config,app_id")
+      .eq("app_id", "onsite-d");
+
+    const guideSubsections = (subsectionData ?? [])
+      .map((sub) => {
+        const appConfig =
+          sub.app_config && typeof sub.app_config === "object"
+            ? (sub.app_config as Record<string, unknown>)
+            : null;
+        const guideXmlRaw = appConfig?.guide_xml;
+        const guideXml = Array.isArray(guideXmlRaw) ? guideXmlRaw : [];
+        const legacyId =
+          typeof appConfig?.legacy_id === "string" && appConfig.legacy_id.trim()
+            ? appConfig.legacy_id.trim()
+            : null;
+        if (guideXml.length <= 0 || !legacyId) return null;
+        const normalizedDirection: "onwards" | "backwards" =
+          sub.direction === "backwards" ? "backwards" : "onwards";
+        return {
+          subsectionId: sub.id,
+          legacyId,
+          name: sub.name ?? "Section",
+          totalFittings: guideXml.length,
+          startCh: Number(sub.start_ch) || 0,
+          endCh: Number(sub.end_ch) || 0,
+          direction: normalizedDirection,
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => x != null);
+
+    for (const sub of guideSubsections) {
+      const { count } = await supabase
+        .from("drainer_pipe_records")
+        .select("id", { count: "exact", head: true })
+        .eq("section_id", sub.legacyId);
+      const installedCount = count ?? 0;
+      const progressPct =
+        sub.totalFittings > 0
+          ? Math.round((installedCount / sub.totalFittings) * 1000) / 10
+          : 0;
+
+      const { data: records } = await supabase
+        .from("drainer_pipe_records")
+        .select("chainage")
+        .eq("section_id", sub.legacyId)
+        .not("chainage", "is", null);
+      const chainages = (records ?? [])
+        .map((r) => Number((r as { chainage?: unknown }).chainage))
+        .filter((n) => Number.isFinite(n));
+      const pipeFront =
+        chainages.length > 0
+          ? sub.direction === "backwards"
+            ? Math.min(...chainages)
+            : Math.max(...chainages)
+          : null;
+
+      resultsBySectionId.set(sub.legacyId, {
+        id: sub.legacyId,
+        name: sub.name,
+        startCh: sub.startCh,
+        endCh: sub.endCh,
+        direction: sub.direction,
+        pipeCount: installedCount,
+        pipeFront: pipeFront != null ? Math.round(pipeFront * 100) / 100 : null,
+        progressPct,
+        isComplete: progressPct >= 100,
+        guideBased: true,
+        totalFittings: sub.totalFittings,
+      });
+    }
+
+    return Array.from(resultsBySectionId.values());
+  } catch (err) {
+    console.error("[Dashboard] getSectionProgressForCrew failed:", err);
     return [];
   }
 }
@@ -1043,7 +1195,8 @@ export async function getActiveVehicleCount(
 
 // --- CURRENT MONTH DAILY PROGRESS ---
 export async function getCurrentMonthDailyProgress(
-  crewId?: string | null
+  crewId?: string | null,
+  sectionIdsFilter?: string[]
 ): Promise<MonthlyDayValue[]> {
   const today = getTodayPerth();
   const now = new Date();
@@ -1074,7 +1227,11 @@ export async function getCurrentMonthDailyProgress(
       }));
     }
     let sectionIds: string[] = [];
-    if (crewId) sectionIds = await getSectionIdsForCrew(crewId);
+    if (sectionIdsFilter && sectionIdsFilter.length > 0) {
+      sectionIds = sectionIdsFilter;
+    } else if (crewId) {
+      sectionIds = await getSectionIdsForCrew(crewId);
+    }
 
     const { start: startTs } = dayStartEndPerth(workingDays[0]);
     const { end: endTs } = dayStartEndPerth(workingDays[workingDays.length - 1]);

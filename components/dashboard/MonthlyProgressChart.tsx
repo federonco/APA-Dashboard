@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   LineChart,
   Line,
@@ -11,16 +11,7 @@ import {
   Tooltip,
 } from "recharts";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { tokens } from "@/lib/designTokens";
-import { ChartLegend } from "./ChartLegend";
-import { CustomTooltip } from "./CustomTooltip";
 import type { MonthlyDayValue } from "@/lib/queries/daily";
 import { PIPE_LENGTH_M } from "@/lib/constants";
 import { MANROPE_STACK } from "@/lib/fonts";
@@ -34,6 +25,17 @@ import {
 type Props = {
   data: MonthlyDayValue[];
   historicData?: MonthlyDayValue[];
+  sectionSeries?: {
+    id: string;
+    name: string;
+    data: MonthlyDayValue[];
+    isComplete?: boolean;
+    excludeFromSelector?: boolean;
+    guideBased?: boolean;
+    totalFittings?: number;
+    startCh?: number;
+    endCh?: number;
+  }[];
 };
 
 type LineStyle = {
@@ -52,8 +54,8 @@ type TargetRange = {
 type ChartEditorSettings = {
   title: string;
   pipe: LineStyle;
-  backfill: LineStyle;
   target: LineStyle;
+  targetUnit: string;
   targetRanges?: TargetRange[];
 };
 
@@ -86,12 +88,12 @@ function safeParseSettings(raw: string | null): ChartEditorSettings | null {
       typeof (x as LineStyle).color === "string" &&
       typeof (x as LineStyle).width === "number" &&
       typeof (x as LineStyle).dash === "string";
-    if (!hasLine(v.pipe) || !hasLine(v.backfill) || !hasLine(v.target)) return null;
+    if (!hasLine(v.pipe) || !hasLine(v.target)) return null;
     return {
       title: v.title,
       pipe: v.pipe,
-      backfill: v.backfill,
       target: v.target,
+      targetUnit: typeof v.targetUnit === "string" && v.targetUnit.trim() ? v.targetUnit : "Pipe/Fitting",
       targetRanges: Array.isArray(v.targetRanges)
         ? v.targetRanges
             .filter(
@@ -116,49 +118,22 @@ function safeParseSettings(raw: string | null): ChartEditorSettings | null {
   }
 }
 
-function weekOfMonth(dateStr: string): number {
-  const d = parseInt(dateStr.slice(8, 10), 10);
-  return Math.ceil(d / 7);
-}
-
-function aggregateByWeek(days: MonthlyDayValue[]): MonthlyDayValue[] {
-  const byWeek = new Map<number, { pipe: number; backfill: number }>();
-  for (const d of days) {
-    const w = weekOfMonth(d.date);
-    const cur = byWeek.get(w) ?? { pipe: 0, backfill: 0 };
-    byWeek.set(w, {
-      pipe: cur.pipe + d.pipeMetres,
-      backfill: cur.backfill + d.backfillMetres,
-    });
-  }
-  let pipeCum = 0;
-  let backfillCum = 0;
-  return Array.from({ length: 4 }, (_, i) => i + 1).map((w) => {
-    const v = byWeek.get(w) ?? { pipe: 0, backfill: 0 };
-    pipeCum += v.pipe;
-    backfillCum += v.backfill;
-    return {
-      date: `W${w}`,
-      label: `Week ${w}`,
-      pipeMetres: v.pipe,
-      backfillMetres: v.backfill,
-      pipeMetresCumulative: pipeCum,
-      backfillMetresCumulative: backfillCum,
-    };
-  });
-}
-
-export function MonthlyProgressChart({ data, historicData = [] }: Props) {
-  const [viewMode, setViewMode] = useState<"current" | "weeks">("current");
+export function MonthlyProgressChart({ data, historicData = [], sectionSeries = [] }: Props) {
+  const [sectionFilter, setSectionFilter] = useState<string>("");
   const [pipesPerDay, setPipesPerDay] = useState<number>(1);
-  const [visible, setVisible] = useState({ pipe: true, backfill: true });
   const [editorOpen, setEditorOpen] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const isDragging = useRef(false);
+  const startX = useRef(0);
+  const scrollLeft = useRef(0);
+  const didDrag = useRef(false);
+  const [edgeSpacer, setEdgeSpacer] = useState(0);
 
   const [settings, setSettings] = useState<ChartEditorSettings>(() => ({
     title: "Daily progress — current month",
-    pipe: { color: tokens.charts.pipeLaid, width: chartLineVisual.strokeWidth, dash: "" },
-    backfill: { color: tokens.charts.backfill, width: chartLineVisual.strokeWidth, dash: "" },
+    pipe: { color: "#f97316", width: chartLineVisual.strokeWidth, dash: "" },
     target: { color: tokens.text.muted, width: chartLineVisual.targetStrokeWidth, dash: "4 4" },
+    targetUnit: "Pipe/Fitting",
     targetRanges: [],
   }));
 
@@ -178,10 +153,107 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
     }
   }, [settings]);
 
+  const selectedSourceData = useMemo(() => {
+    const selected = sectionSeries.find((s) => s.id === sectionFilter);
+    return selected?.data ?? [];
+  }, [sectionFilter, sectionSeries]);
+  const selectedSectionMeta = useMemo(
+    () => sectionSeries.find((s) => s.id === sectionFilter),
+    [sectionSeries, sectionFilter]
+  );
+  const visibleSections = useMemo(
+    () =>
+      sectionSeries
+        .filter((s) => !s.isComplete && !s.excludeFromSelector)
+        .map((s) => ({ id: s.id, name: s.name })),
+    [sectionSeries]
+  );
+
+  useEffect(() => {
+    const stillVisible = visibleSections.some((s) => s.id === sectionFilter);
+    if (!stillVisible) setSectionFilter(visibleSections[0]?.id ?? "");
+  }, [visibleSections, sectionFilter]);
+
+  const onMouseDown = (e: React.MouseEvent) => {
+    isDragging.current = true;
+    didDrag.current = false;
+    startX.current = e.pageX - (scrollRef.current?.offsetLeft ?? 0);
+    scrollLeft.current = scrollRef.current?.scrollLeft ?? 0;
+  };
+
+  const onMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging.current) return;
+    e.preventDefault();
+    const x = e.pageX - (scrollRef.current?.offsetLeft ?? 0);
+    const walk = x - startX.current;
+    if (Math.abs(walk) > 5) didDrag.current = true;
+    if (scrollRef.current) scrollRef.current.scrollLeft = scrollLeft.current - walk;
+  };
+
+  const onMouseUp = () => {
+    isDragging.current = false;
+  };
+
+  const onMouseLeave = () => {
+    isDragging.current = false;
+  };
+
+  const centerSelectedSection = (sectionId: string) => {
+    const container = scrollRef.current;
+    if (!container || !sectionId) return;
+    const pill = container.querySelector<HTMLElement>(`[data-section-id="${sectionId}"]`);
+    if (!pill) return;
+    const left = pill.offsetLeft - (container.clientWidth - pill.clientWidth) / 2;
+    container.scrollTo({ left: Math.max(0, left), behavior: "smooth" });
+  };
+
+  const recalcEdgeSpacer = () => {
+    const container = scrollRef.current;
+    if (!container) return;
+    const pill = container.querySelector<HTMLElement>("[data-section-id]");
+    if (!pill) return;
+    const spacer = Math.max(0, (container.clientWidth - pill.clientWidth) / 2);
+    setEdgeSpacer(spacer);
+  };
+
+  const scrollToSection = (direction: "prev" | "next") => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const pillWidth = (el.firstElementChild as HTMLElement | null)?.clientWidth ?? 200;
+    if (visibleSections.length > 0) {
+      const foundIndex = visibleSections.findIndex((s) => s.id === sectionFilter);
+      const currentIndex = foundIndex >= 0 ? foundIndex : 0;
+      const targetIndex =
+        direction === "next"
+          ? (currentIndex + 1) % visibleSections.length
+          : (currentIndex - 1 + visibleSections.length) % visibleSections.length;
+      const nextId = visibleSections[targetIndex]?.id ?? sectionFilter;
+      setSectionFilter(nextId);
+      centerSelectedSection(nextId);
+    }
+    el.scrollBy({
+      left: direction === "next" ? pillWidth + 12 : -(pillWidth + 12),
+      behavior: "smooth",
+    });
+  };
+
+  useEffect(() => {
+    if (!sectionFilter) return;
+    centerSelectedSection(sectionFilter);
+  }, [sectionFilter]);
+
+  useEffect(() => {
+    recalcEdgeSpacer();
+    const onResize = () => recalcEdgeSpacer();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [visibleSections.length]);
+
   const chartData = useMemo(() => {
     // Build daily target first, then aggregate to weeks if needed.
     let targetCum = 0;
-    const daily = data.map((d) => {
+    const daily = selectedSourceData.map((d) => {
+      const guideTotal = selectedSectionMeta?.totalFittings ?? 0;
       const rangeMatch = (settings.targetRanges ?? []).find(
         (r) => r.start && r.end && d.date >= r.start && d.date <= r.end
       );
@@ -190,74 +262,68 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
           ? rangeMatch.pipesPerDay
           : pipesPerDay
         : 0;
-      const targetMeters = activeTargetPipes * PIPE_LENGTH_M;
+      const targetMeters =
+        selectedSectionMeta?.guideBased &&
+        guideTotal > 0 &&
+        selectedSectionMeta.startCh != null &&
+        selectedSectionMeta.endCh != null
+          ? (activeTargetPipes / guideTotal) *
+            Math.abs(selectedSectionMeta.endCh - selectedSectionMeta.startCh)
+          : activeTargetPipes * PIPE_LENGTH_M;
       targetCum += targetMeters;
       return {
         ...d,
-        pipeTargetCumulative: targetCum,
+        pipeTargetCumulative: Math.round(targetCum),
         pipePipesPerDay: d.pipeMetres / PIPE_LENGTH_M,
       };
     });
 
-    if (viewMode !== "weeks" || daily.length === 0) return daily;
-
-    const byWeek = new Map<number, { pipe: number; backfill: number }>();
-    for (const d of daily) {
-      const w = weekOfMonth(d.date);
-      const cur = byWeek.get(w) ?? { pipe: 0, backfill: 0 };
-      byWeek.set(w, {
-        pipe: cur.pipe + d.pipeMetres,
-        backfill: cur.backfill + d.backfillMetres,
-      });
-    }
-
-    // Simpler and stable: weekly target = sum of daily target increments.
-    const targetByWeek = new Map<number, number>();
-    for (const d of daily) {
-      const w = weekOfMonth(d.date);
-      const prev = targetByWeek.get(w) ?? 0;
-      const rangeMatch = (settings.targetRanges ?? []).find(
-        (r) => r.start && r.end && d.date >= r.start && d.date <= r.end
-      );
-      const activeTargetPipes = isWaWorkingDay(d.date)
-        ? rangeMatch
-          ? rangeMatch.pipesPerDay
-          : pipesPerDay
-        : 0;
-      targetByWeek.set(w, prev + activeTargetPipes * PIPE_LENGTH_M);
-    }
-
-    let pipeCum = 0;
-    let backfillCum = 0;
-    let targetWeekCum = 0;
-    return Array.from({ length: 4 }, (_, i) => i + 1).map((w) => {
-      const v = byWeek.get(w) ?? { pipe: 0, backfill: 0 };
-      const targetWeek = targetByWeek.get(w) ?? 0;
-      pipeCum += v.pipe;
-      backfillCum += v.backfill;
-      targetWeekCum += targetWeek;
-      return {
-        date: `W${w}`,
-        label: `Week ${w}`,
-        pipeMetres: v.pipe,
-        backfillMetres: v.backfill,
-        pipeMetresCumulative: pipeCum,
-        backfillMetresCumulative: backfillCum,
-        pipeTargetCumulative: targetWeekCum,
-        pipePipesPerDay: v.pipe / PIPE_LENGTH_M,
-      };
-    });
-  }, [data, pipesPerDay, settings.targetRanges, viewMode]);
-  const toggle = (key: keyof typeof visible) => () =>
-    setVisible((v) => ({ ...v, [key]: !v[key] }));
-
-  const legendItems = useMemo(
-    () => [
-      { label: "Pipe laid", color: settings.pipe.color, active: visible.pipe, onClick: toggle("pipe") },
-      { label: "Backfill", color: settings.backfill.color, active: visible.backfill, onClick: toggle("backfill") },
-    ],
-    [settings, visible]
-  );
+    return daily;
+  }, [selectedSourceData, pipesPerDay, settings.targetRanges, selectedSectionMeta]);
+  const renderTooltip = (props: any) => {
+    const { active, payload, label } = props as {
+      active?: boolean;
+      payload?: readonly any[];
+      label?: string;
+    };
+    if (!active || !payload?.length) return null;
+    const pipe = payload.find((p) => p.dataKey === "pipeMetresCumulative");
+    const target = payload.find((p) => p.dataKey === "pipeTargetCumulative");
+    return (
+      <div
+        className="rounded-lg px-3 py-2 text-xs shadow-md"
+        style={{
+          backgroundColor: "#ffffff",
+          border: "1px solid #e4e4e7",
+          fontFamily: "var(--font-dm-mono), monospace",
+          minWidth: "140px",
+        }}
+      >
+        <p className="mb-1 font-semibold text-zinc-500">{label}</p>
+        {pipe && (
+          <div className="flex items-center justify-between gap-4">
+            <span className="flex items-center gap-1.5 text-zinc-700">
+              <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: "#f97316" }} />
+              Pipe laid
+            </span>
+            <span className="font-semibold text-zinc-800">{pipe.value} m</span>
+          </div>
+        )}
+        {target && (
+          <div className="mt-0.5 flex items-center justify-between gap-4">
+            <span className="flex items-center gap-1.5 text-zinc-400 italic">
+              <span
+                className="inline-block h-px w-2.5"
+                style={{ backgroundColor: "#94a3b8", borderTop: "1.5px dashed #94a3b8" }}
+              />
+              Projected
+            </span>
+            <span className="text-zinc-400 italic">{target.value} m</span>
+          </div>
+        )}
+      </div>
+    );
+  };
   if (!chartData || chartData.length === 0) {
     return (
       <Card
@@ -298,10 +364,6 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
     );
   }
 
-  const last = chartData[chartData.length - 1];
-  const pipeM = last?.pipeMetresCumulative ?? 0;
-  const backfillM = last?.backfillMetresCumulative ?? 0;
-
   return (
     <Card
       className="h-full flex flex-col overflow-visible"
@@ -323,43 +385,118 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
           gap: 8,
         }}
       >
-        <div className="flex items-center gap-2">
-          <span
-            style={{
-              fontSize: tokens.typography.subtitle,
-              fontWeight: 500,
-              color: tokens.text.secondary,
-              letterSpacing: "0.02em",
-            }}
-          >
-            {settings.title || "Daily progress"}
-          </span>
-          {data.length > 0 && (
-            <Select
-              value={viewMode}
-              onValueChange={(v) => setViewMode(v as "current" | "weeks")}
-              items={{
-                current: "Current month",
-                weeks: "Weeks of the month",
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="mb-4 flex flex-col gap-0.5">
+            <span
+              className="text-xs font-semibold uppercase tracking-widest"
+              style={{
+                color: "#f97316",
+                fontFamily: "var(--font-barlow), sans-serif",
+                letterSpacing: "0.15em",
               }}
             >
-              <SelectTrigger className="h-8 min-w-[10.75rem] text-xs font-medium">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="current">Current month</SelectItem>
-                <SelectItem value="weeks">Weeks of the month</SelectItem>
-              </SelectContent>
-            </Select>
+              Pipe Laying
+            </span>
+            <h2
+              className="text-xl font-bold leading-tight"
+              style={{ color: "#ffffff", fontFamily: "var(--font-barlow), sans-serif" }}
+            >
+              Monthly Cumulative
+            </h2>
+          </div>
+          {data.length > 0 && (
+            <div className="mb-4 flex items-center gap-2">
+              <button
+                onClick={() => scrollToSection("prev")}
+                className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full transition-all duration-150"
+                style={{
+                  border: "1.5px solid #d4d4d8",
+                  color: "#71717a",
+                  backgroundColor: "transparent",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#f97316")}
+                onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#d4d4d8")}
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path
+                    d="M7.5 2L3.5 6L7.5 10"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+              <div
+                ref={scrollRef}
+                onMouseDown={onMouseDown}
+                onMouseMove={onMouseMove}
+                onMouseUp={onMouseUp}
+                onMouseLeave={onMouseLeave}
+                className="scrollbar-none flex flex-1 cursor-grab gap-3 overflow-x-auto py-1 active:cursor-grabbing"
+                style={{
+                  scrollSnapType: "x mandatory",
+                  WebkitOverflowScrolling: "touch",
+                  userSelect: "none",
+                }}
+              >
+                <div aria-hidden style={{ minWidth: edgeSpacer }} />
+                {visibleSections.map((section) => {
+                  const isActive = sectionFilter === section.id;
+                  return (
+                    <button
+                      key={section.id}
+                      data-section-id={section.id}
+                      onClick={() => {
+                        if (!didDrag.current) {
+                          setSectionFilter(section.id);
+                          centerSelectedSection(section.id);
+                        }
+                      }}
+                      className="flex-shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-xs font-semibold transition-all duration-200 hover:border-[#f97316]/60"
+                      style={{
+                        scrollSnapAlign: "start",
+                        width: "calc(100% - 3rem)",
+                        minWidth: "calc(100% - 3rem)",
+                        fontFamily: "var(--font-dm-mono), monospace",
+                        background: isActive
+                          ? "linear-gradient(to right, transparent 0%, transparent 24%, #fdba7422 40%, #fdba7455 48%, #fdba7455 52%, #fdba7422 60%, transparent 76%, transparent 100%)"
+                          : "transparent",
+                        color: isActive ? "#1a1a1a" : "#71717a",
+                        fontWeight: isActive ? 700 : 600,
+                        border: "none",
+                        textAlign: "center",
+                      }}
+                    >
+                      {section.name}
+                    </button>
+                  );
+                })}
+                <div aria-hidden style={{ minWidth: edgeSpacer }} />
+              </div>
+              <button
+                onClick={() => scrollToSection("next")}
+                className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full transition-all duration-150"
+                style={{
+                  border: "1.5px solid #d4d4d8",
+                  color: "#71717a",
+                  backgroundColor: "transparent",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#f97316")}
+                onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#d4d4d8")}
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path
+                    d="M4.5 2L8.5 6L4.5 10"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            </div>
           )}
-          <button
-            type="button"
-            onClick={() => setEditorOpen((p) => !p)}
-            className="ml-1 inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-card text-zinc-600 hover:bg-muted"
-            aria-label="Chart settings"
-          >
-            ⋮
-          </button>
         </div>
         <div
           className="relative"
@@ -370,6 +507,14 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
             gap: 4,
           }}
         >
+          <button
+            type="button"
+            onClick={() => setEditorOpen((p) => !p)}
+            className="ml-1 inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-card text-zinc-600 hover:bg-muted"
+            aria-label="Chart settings"
+          >
+            ⋮
+          </button>
           {editorOpen && (
             <div
               className="absolute right-0 top-10 z-[9999] w-[520px] max-w-[min(90vw,520px)] rounded-lg border border-border bg-card p-3 shadow-lg"
@@ -378,24 +523,9 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
                 <div className="col-span-2">
                   <label
                     className="mb-1 block text-[11px] font-medium text-zinc-600"
-                    title="Edit the chart title shown in the card header."
-                  >
-                    Title
-                  </label>
-                  <input
-                    className="h-8 w-full rounded-md border border-border bg-white px-2 text-sm"
-                    value={settings.title}
-                    onChange={(e) => setSettings((s) => ({ ...s, title: e.target.value }))}
-                    placeholder="Daily progress — current month"
-                    title="Edit the chart title shown in the card header."
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label
-                    className="mb-1 block text-[11px] font-medium text-zinc-600"
                     title="Set the daily target in number of pipes."
                   >
-                    Default target (pipes / day)
+                    Default target ({settings.targetUnit})
                   </label>
                   <input
                     type="number"
@@ -410,6 +540,26 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
                     }
                     className="h-8 w-28 rounded-md border border-border bg-white px-2 text-sm"
                     title="Set the daily target in number of pipes."
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label
+                    className="mb-1 block text-[11px] font-medium text-zinc-600"
+                    title="Edit unit shown for target."
+                  >
+                    Unit to measure
+                  </label>
+                  <input
+                    className="h-8 w-full rounded-md border border-border bg-white px-2 text-sm"
+                    value={settings.targetUnit}
+                    onChange={(e) =>
+                      setSettings((s) => ({
+                        ...s,
+                        targetUnit: e.target.value || "Pipe/Fitting",
+                      }))
+                    }
+                    placeholder="Pipe/Fitting"
+                    title="Edit unit shown for target."
                   />
                 </div>
                 <div className="col-span-2 rounded-md border border-border bg-white/70 p-2">
@@ -509,7 +659,6 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
 
                 {([
                   ["Pipe laid", "pipe"] as const,
-                  ["Backfill", "backfill"] as const,
                   ["Target", "target"] as const,
                 ]).map(([label, key]) => (
                   <div key={key} className="col-span-2">
@@ -568,10 +717,8 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
                             ...s,
                             [key]:
                               key === "pipe"
-                                ? { color: tokens.charts.pipeLaid, width: chartLineVisual.strokeWidth, dash: "" }
-                                : key === "backfill"
-                                  ? { color: tokens.charts.backfill, width: chartLineVisual.strokeWidth, dash: "" }
-                                  : { color: tokens.text.muted, width: chartLineVisual.targetStrokeWidth, dash: "4 4" },
+                                ? { color: "#f97316", width: chartLineVisual.strokeWidth, dash: "" }
+                                : { color: tokens.text.muted, width: chartLineVisual.targetStrokeWidth, dash: "4 4" },
                           }))
                         }
                         className="h-8 rounded-md border border-border bg-card px-2 text-xs font-medium text-zinc-700 hover:bg-muted"
@@ -615,74 +762,58 @@ export function MonthlyProgressChart({ data, historicData = [] }: Props) {
                 tickLine={false}
                 unit=" m"
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={renderTooltip} />
               <Line
                 type="monotone"
                 dataKey="pipeTargetCumulative"
-            stroke={settings.target.color}
-            strokeWidth={settings.target.width}
-                strokeOpacity={chartLineVisual.projectionStrokeOpacity}
-            strokeDasharray={settings.target.dash || undefined}
+                name="Projected"
+                stroke="#94a3b8"
+                strokeWidth={1.5}
+                strokeDasharray="6 4"
                 dot={false}
-                name={`Target (at ${pipesPerDay} pipes/day)`}
+                activeDot={false}
+                connectNulls
               />
-              {visible.pipe && (
-                <>
-                  <Line
-                    type="monotone"
-                    dataKey="pipeMetresCumulative"
+              <Line
+                type="monotone"
+                dataKey="pipeMetresCumulative"
                 stroke={settings.pipe.color}
-                    strokeWidth={chartLineVisual.glowStrokeWidth}
-                    strokeOpacity={chartLineVisual.glowStrokeOpacity}
-                    dot={false}
-                    activeDot={false}
-                    name={CHART_GLOW_LINE_NAME}
-                    legendType="none"
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="pipeMetresCumulative"
+                strokeWidth={chartLineVisual.glowStrokeWidth}
+                strokeOpacity={chartLineVisual.glowStrokeOpacity}
+                dot={false}
+                activeDot={false}
+                name={CHART_GLOW_LINE_NAME}
+                legendType="none"
+              />
+              <Line
+                type="monotone"
+                dataKey="pipeMetresCumulative"
                 stroke={settings.pipe.color}
                 strokeWidth={settings.pipe.width}
-                    strokeOpacity={chartLineVisual.strokeOpacity}
+                strokeOpacity={chartLineVisual.strokeOpacity}
                 strokeDasharray={settings.pipe.dash || undefined}
-                    dot={chartSeriesDot(tokens.charts.pipeLaid)}
-                    activeDot={chartSeriesActiveDot(tokens.charts.pipeLaid)}
-                    name="Pipe laid"
-                  />
-                </>
-              )}
-              {visible.backfill && (
-                <>
-                  <Line
-                    type="monotone"
-                    dataKey="backfillMetresCumulative"
-                stroke={settings.backfill.color}
-                    strokeWidth={chartLineVisual.glowStrokeWidth}
-                    strokeOpacity={chartLineVisual.glowStrokeOpacity}
-                    dot={false}
-                    activeDot={false}
-                    name={CHART_GLOW_LINE_NAME}
-                    legendType="none"
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="backfillMetresCumulative"
-                stroke={settings.backfill.color}
-                strokeWidth={settings.backfill.width}
-                    strokeOpacity={chartLineVisual.strokeOpacity}
-                strokeDasharray={settings.backfill.dash || undefined}
-                    dot={chartSeriesDot(tokens.charts.backfill)}
-                    activeDot={chartSeriesActiveDot(tokens.charts.backfill)}
-                    name="Backfill"
-                  />
-                </>
-              )}
+                dot={chartSeriesDot(tokens.charts.pipeLaid)}
+                activeDot={chartSeriesActiveDot(tokens.charts.pipeLaid)}
+                name="Pipe laid"
+              />
             </LineChart>
           </ResponsiveContainer>
         </div>
-        <div className="shrink-0 pt-3">
-          <ChartLegend items={legendItems} className="pt-0" />
+        <div className="mt-2 ml-1 flex shrink-0 items-center gap-5 pt-3">
+          <div className="flex items-center gap-2">
+            <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: "#f97316" }} />
+            <span className="text-xs text-zinc-500" style={{ fontFamily: "var(--font-dm-mono), monospace" }}>
+              Pipe laid
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <svg width="20" height="10" className="overflow-visible">
+              <line x1="0" y1="5" x2="20" y2="5" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="5 3" />
+            </svg>
+            <span className="text-xs text-zinc-400 italic" style={{ fontFamily: "var(--font-dm-mono), monospace" }}>
+              Projected
+            </span>
+          </div>
         </div>
       </CardContent>
     </Card>

@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
   const admin = requireAdminClient();
   let secQuery = admin
     .from("sections")
-    .select("id, name, scope, app_id, start_ch, end_ch, direction, crew_id, project_id, is_active, crews(name)")
+    .select("id, name, scope, app_id, start_ch, end_ch, direction, crew_id, project_id, is_active, show_in_portfolio, crews(name)")
     .order("name");
   if (!includeInactive) {
     secQuery = secQuery.eq("is_active", true);
@@ -104,6 +104,7 @@ type PostSectionBody = {
   direction?: unknown;
   crew_id?: unknown;
   project_id?: unknown;
+  show_in_portfolio?: unknown;
 };
 
 function parseNum(v: unknown): number | null {
@@ -157,10 +158,11 @@ export async function POST(req: NextRequest) {
       direction,
       crew_id: crewId,
       project_id: projectId,
+      show_in_portfolio: body.show_in_portfolio === false ? false : true,
       app_config: {},
       is_active: true,
     })
-    .select("id, name, scope, app_id, start_ch, end_ch, direction, crew_id, project_id, is_active, crews(name)")
+    .select("id, name, scope, app_id, start_ch, end_ch, direction, crew_id, project_id, is_active, show_in_portfolio, crews(name)")
     .single();
 
   if (error) {

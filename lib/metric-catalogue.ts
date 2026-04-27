@@ -67,9 +67,29 @@ export const METRIC_CATALOGUE = [
     category: "welding" as const,
     requiresSection: true,
     requiresCrew: false,
-    allowsSubsection: false,
+    allowsSubsection: true,
     color: "orange",
-    icon: "🔥",
+    icon: "",
+  },
+  {
+    key: "weld_done",
+    label: "Weld",
+    category: "welding" as const,
+    requiresSection: true,
+    requiresCrew: false,
+    allowsSubsection: true,
+    color: "blue",
+    icon: "",
+  },
+  {
+    key: "wrap_done",
+    label: "Wrap",
+    category: "welding" as const,
+    requiresSection: true,
+    requiresCrew: false,
+    allowsSubsection: true,
+    color: "green",
+    icon: "",
   },
   {
     key: "water_loads_today",
@@ -110,5 +130,5 @@ export function categoryLabel(cat: MetricCategory): string {
   return CATEGORY_LABEL[cat] ?? cat;
 }
 
-const WIZARD_SKIP = new Set<string>([]);
+const WIZARD_SKIP = new Set<string>(["welds_required"]);
 export const METRICS_IN_ADMIN_WIZARD = METRIC_CATALOGUE.filter((m) => !WIZARD_SKIP.has(m.key));

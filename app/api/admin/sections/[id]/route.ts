@@ -31,7 +31,7 @@ export async function GET(
   const admin = requireAdminClient();
   const { data: section, error } = await admin
     .from("sections")
-    .select("id, name, scope, start_ch, end_ch, direction, crew_id, crews(name)")
+    .select("id, name, scope, start_ch, end_ch, direction, crew_id, show_in_portfolio, crews(name)")
     .eq("id", id)
     .maybeSingle();
 
@@ -72,6 +72,7 @@ type PatchSectionBody = {
   direction?: unknown;
   crew_id?: unknown;
   is_active?: unknown;
+  show_in_portfolio?: unknown;
 };
 
 export async function PATCH(
@@ -138,6 +139,10 @@ export async function PATCH(
     updates.is_active = Boolean(body.is_active);
   }
 
+  if (body.show_in_portfolio !== undefined) {
+    updates.show_in_portfolio = Boolean(body.show_in_portfolio);
+  }
+
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: "No fields to update" }, { status: 400 });
   }
@@ -147,7 +152,7 @@ export async function PATCH(
     .from("sections")
     .update(updates)
     .eq("id", id)
-    .select("id, name, scope, app_id, start_ch, end_ch, direction, crew_id, project_id, is_active, crews(name)")
+    .select("id, name, scope, app_id, start_ch, end_ch, direction, crew_id, project_id, is_active, show_in_portfolio, crews(name)")
     .maybeSingle();
 
   if (error) {

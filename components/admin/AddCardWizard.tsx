@@ -156,6 +156,8 @@ export function AddCardWizard({
   function buildDefaultLabel(): string {
     const c = catalogueEntry(metricKey);
     if (!c) return label;
+    if (metricKey === "weld_done") return "Joints Welded";
+    if (metricKey === "wrap_done") return "Joints Wrapped";
     const parts: string[] = [c.label];
     if (sectionName) parts.push(`— ${sectionName}`);
     if (subsectionName) parts.push(`(${subsectionName})`);
@@ -246,7 +248,7 @@ export function AddCardWizard({
                           background: metricKey === m.key ? "#FFF7ED" : "#fff",
                         }}
                       >
-                        <span className="mr-1">{m.icon}</span>
+                        {m.icon ? <span className="mr-1">{m.icon}</span> : null}
                         {m.label}
                       </button>
                     ))}

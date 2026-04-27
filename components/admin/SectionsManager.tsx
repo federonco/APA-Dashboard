@@ -26,6 +26,7 @@ export type SectionListRow = {
   crew_id: string | null;
   project_id?: string | null;
   is_active: boolean;
+  show_in_portfolio?: boolean;
   crew_name: string | null;
   admin_count: number;
   subsections: SubsectionListRow[];
@@ -134,7 +135,7 @@ export function SectionsManager() {
         <table className="w-full min-w-[880px] text-sm" style={{ color: "#3f3f46" }}>
           <thead>
             <tr style={{ background: "#F7F7F7", borderBottom: `1px solid ${tokens.theme.border}` }}>
-              {["Name", "Scope", "App", "Crew", "Admins", "Chainage", "Actions"].map((h) => (
+              {["Name", "Scope", "App", "Crew", "Portfolio", "Admins", "Chainage", "Actions"].map((h) => (
                 <th
                   key={h}
                   className="px-4 py-3 text-left text-[11px] font-medium uppercase"
@@ -148,7 +149,7 @@ export function SectionsManager() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={7} className="px-5 py-8 text-center text-sm" style={{ color: textMuted }}>
+                <td colSpan={8} className="px-5 py-8 text-center text-sm" style={{ color: textMuted }}>
                   Loading…
                 </td>
               </tr>
@@ -178,6 +179,7 @@ export function SectionsManager() {
                       <td className="px-4 py-3 text-xs">{s.scope ?? "—"}</td>
                       <td className="px-4 py-3 text-xs">{s.app_id ?? "—"}</td>
                       <td className="px-4 py-3 text-xs">{s.crew_name ?? "—"}</td>
+                      <td className="px-4 py-3 text-xs">{s.show_in_portfolio === false ? "Hidden" : "Visible"}</td>
                       <td className="px-4 py-3 text-xs">{s.admin_count}</td>
                       <td className="px-4 py-3 text-xs" style={{ color: textMuted }}>
                         {chainageLabel(s)}
@@ -234,6 +236,7 @@ export function SectionsManager() {
                           </td>
                           <td className="px-4 py-2 text-xs">—</td>
                           <td className="px-4 py-2 text-xs">{sub.app_id}</td>
+                          <td className="px-4 py-2 text-xs">—</td>
                           <td className="px-4 py-2 text-xs">—</td>
                           <td className="px-4 py-2 text-xs">—</td>
                           <td className="px-4 py-2 text-xs" style={{ color: textMuted }}>
@@ -450,6 +453,7 @@ type SectionPayload = {
   direction: string | null;
   crew_id: string | null;
   is_active?: boolean;
+  show_in_portfolio?: boolean;
 };
 
 function parseOptionalNumberField(raw: string): number | null | "invalid" {
@@ -486,6 +490,7 @@ function SectionForm({
   const [endCh, setEndCh] = useState(initial?.end_ch != null ? String(initial.end_ch) : "");
   const [direction, setDirection] = useState(initial?.direction ?? "");
   const [isActive, setIsActive] = useState(initial?.is_active !== false);
+  const [showInPortfolio, setShowInPortfolio] = useState(initial?.show_in_portfolio !== false);
   const [localError, setLocalError] = useState<string | null>(null);
 
   const displayError = error ?? localError;
@@ -511,6 +516,7 @@ function SectionForm({
           end_ch: ec,
           direction: direction === "" ? null : direction,
           crew_id: crewId === "" ? null : crewId,
+          show_in_portfolio: showInPortfolio,
           ...(isEdit ? { is_active: isActive } : {}),
         });
       }}
@@ -596,6 +602,16 @@ function SectionForm({
           <option value="backwards">backwards</option>
         </select>
       </Field>
+      {isEdit && (
+        <label className="flex cursor-pointer items-center gap-2 text-xs" style={{ color: "#52525b" }}>
+          <input
+            type="checkbox"
+            checked={showInPortfolio}
+            onChange={(e) => setShowInPortfolio(e.target.checked)}
+          />
+          Show in portfolio
+        </label>
+      )}
       {isEdit && (
         <label className="flex cursor-pointer items-center gap-2 text-xs" style={{ color: "#52525b" }}>
           <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />

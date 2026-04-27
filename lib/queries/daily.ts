@@ -341,10 +341,21 @@ export async function getSectionsForCrew(crewId: string | null): Promise<Section
   try {
     const supabase = createAdminClient();
     if (!supabase) return [];
-    const { data, error } = await supabase
+    const withPortfolio = await supabase
       .from("drainer_sections")
       .select("id, name, start_ch, end_ch, direction")
-      .eq("crew_id", crewId);
+      .eq("crew_id", crewId)
+      .eq("show_in_portfolio", true);
+    let data = withPortfolio.data;
+    let error = withPortfolio.error;
+    if (error?.code === "42703") {
+      const fallback = await supabase
+        .from("drainer_sections")
+        .select("id, name, start_ch, end_ch, direction")
+        .eq("crew_id", crewId);
+      data = fallback.data;
+      error = fallback.error;
+    }
     if (error) throw error;
     return (data ?? []).map((s) => ({
       id: s.id,

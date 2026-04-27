@@ -156,7 +156,9 @@ export async function computeMetricValue(
     metricKey === "pipes_today" ||
     metricKey === "pipes_this_month" ||
     metricKey === "pipes_total" ||
-    metricKey === "welds_required"
+    metricKey === "welds_required" ||
+    metricKey === "weld_done" ||
+    metricKey === "wrap_done"
       ? await resolveDrainerScopeForCard(admin, { sectionId, subsectionId })
       : null;
 
@@ -245,7 +247,63 @@ export async function computeMetricValue(
       let q = admin
         .from("drainer_pipe_records")
         .select("id", { count: "exact", head: true })
-        .eq("joint_type", "WR");
+        .in("joint_type", ["WR", "WB"]);
+      q = applyDrainerPipeScope(q, pipeScope);
+      const { count, error } = await q;
+      if (error) throw error;
+      return count ?? 0;
+    }
+    case "weld_done": {
+      if (!pipeScope) return 0;
+      let q = admin
+        .from("drainer_pipe_records")
+        .select(
+          "joint_type,welded_at,weld_step_e1_at,weld_step_e2_at,weld_step_i1_at,weld_step_i2_at,welded_steps"
+        )
+        .in("joint_type", ["WR", "WB"]);
+      q = applyDrainerPipeScope(q, pipeScope);
+      const { data, error } = await q;
+      if (error) throw error;
+      const rows =
+        (data as Array<{
+          joint_type: string | null;
+          welded_at: string | null;
+          weld_step_e1_at?: string | null;
+          weld_step_e2_at?: string | null;
+          weld_step_i1_at?: string | null;
+          weld_step_i2_at?: string | null;
+          welded_steps?: {
+            external_1?: string | null;
+            external_2?: string | null;
+            internal_1?: string | null;
+            internal_2?: string | null;
+          } | null;
+        }> | null) ?? [];
+      return rows.filter((row) => {
+        if (row.joint_type === "WR") return !!row.welded_at;
+        if (row.joint_type === "WB") {
+          const fromColumns =
+            !!row.weld_step_e1_at &&
+            !!row.weld_step_e2_at &&
+            !!row.weld_step_i1_at &&
+            !!row.weld_step_i2_at;
+          const fromJson =
+            !!row.welded_steps?.external_1 &&
+            !!row.welded_steps?.external_2 &&
+            !!row.welded_steps?.internal_1 &&
+            !!row.welded_steps?.internal_2;
+          return fromColumns || fromJson || !!row.welded_at;
+        }
+        return false;
+      }).length;
+    }
+    case "wrap_done": {
+      if (!pipeScope) return 0;
+      let q = admin
+        .from("drainer_pipe_records")
+        .select("id", { count: "exact", head: true })
+        .in("joint_type", ["WR", "WB"])
+        .not("wrapped_at", "is", null);
       q = applyDrainerPipeScope(q, pipeScope);
       const { count, error } = await q;
       if (error) throw error;

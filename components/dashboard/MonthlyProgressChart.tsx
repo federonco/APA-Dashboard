@@ -395,13 +395,13 @@ export function MonthlyProgressChart({ data, historicData = [], sectionSeries = 
                 letterSpacing: "0.15em",
               }}
             >
-              Pipe Laying
+              Pipe Installed
             </span>
             <h2
               className="text-xl font-bold leading-tight"
-              style={{ color: "#ffffff", fontFamily: "var(--font-barlow), sans-serif" }}
+              style={{ color: tokens.text.primary, fontFamily: "var(--font-barlow), sans-serif" }}
             >
-              Monthly Cumulative
+              Cumulative Month Progress
             </h2>
           </div>
           {data.length > 0 && (

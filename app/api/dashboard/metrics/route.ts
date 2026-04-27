@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
     metric_key: string;
     label: string;
     value: number;
+    value_text?: string;
     section_name: string | null;
     subsection_name: string | null;
     crew_name: string | null;
@@ -76,11 +77,39 @@ export async function GET(req: NextRequest) {
         crewId: row.crew_id,
         dateStr: date,
       });
+      const required =
+        row.metric_key === "weld_done" || row.metric_key === "wrap_done"
+          ? await computeMetricValue("welds_required", {
+              sectionId: row.section_id,
+              subsectionId: row.subsection_id,
+              crewId: row.crew_id,
+              dateStr: date,
+            })
+          : null;
+      const weldCompletedForScope =
+        row.metric_key === "wrap_done"
+          ? await computeMetricValue("weld_done", {
+              sectionId: row.section_id,
+              subsectionId: row.subsection_id,
+              crewId: row.crew_id,
+              dateStr: date,
+            })
+          : null;
+      const pending =
+        row.metric_key === "wrap_done" && weldCompletedForScope != null
+          ? Math.max(weldCompletedForScope - value, 0)
+          : required != null
+            ? Math.max(required - value, 0)
+            : null;
       rows.push({
         id: row.id,
         metric_key: row.metric_key,
         label: row.label,
         value,
+        value_text:
+          required != null
+            ? `${value} / ${pending}`
+            : undefined,
         section_name: sectionName,
         subsection_name: subsectionName,
         crew_name: crewName,

@@ -8,6 +8,7 @@ export type MetricCardData = {
   metric_key: string;
   label: string;
   value: number;
+  value_text?: string;
   section_name: string | null;
   subsection_name?: string | null;
   crew_name: string | null;
@@ -29,11 +30,12 @@ export function MetricCardItem({ card }: { card: MetricCardData }) {
   const sub = [card.section_name, card.subsection_name, card.crew_name].filter(Boolean).join(" · ");
 
   const formatted =
-    card.metric_key.includes("liters") && card.value >= 1000
+    card.value_text ??
+    (card.metric_key.includes("liters") && card.value >= 1000
       ? `${(card.value / 1000).toFixed(1)}k`
       : Number.isInteger(card.value)
         ? String(card.value)
-        : card.value.toLocaleString("en-AU", { maximumFractionDigits: 1 });
+        : card.value.toLocaleString("en-AU", { maximumFractionDigits: 1 }));
 
   return (
     <div
@@ -48,9 +50,11 @@ export function MetricCardItem({ card }: { card: MetricCardData }) {
         <span className="text-[10px] font-medium uppercase tracking-wide" style={{ color: tokens.text.muted }}>
           {card.label}
         </span>
-        <span className="text-sm" aria-hidden>
-          {icon}
-        </span>
+        {icon ? (
+          <span className="text-sm" aria-hidden>
+            {icon}
+          </span>
+        ) : null}
       </div>
       <p className="text-2xl font-semibold tabular-nums" style={{ color: accent }}>
         {formatted}

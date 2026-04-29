@@ -120,7 +120,7 @@ function safeParseSettings(raw: string | null): ChartEditorSettings | null {
 
 export function MonthlyProgressChart({ data, historicData = [], sectionSeries = [] }: Props) {
   const [sectionFilter, setSectionFilter] = useState<string>("");
-  const [pipesPerDay, setPipesPerDay] = useState<number>(1);
+  const [targetMetersBySection, setTargetMetersBySection] = useState<Record<string, number>>({});
   const [editorOpen, setEditorOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
@@ -152,6 +152,29 @@ export function MonthlyProgressChart({ data, historicData = [], sectionSeries = 
       // ignore storage failures
     }
   }, [settings]);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(`${SETTINGS_KEY}.targetMetersBySection`);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Record<string, number>;
+      if (!parsed || typeof parsed !== "object") return;
+      setTargetMetersBySection(parsed);
+    } catch {
+      // ignore storage failures
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        `${SETTINGS_KEY}.targetMetersBySection`,
+        JSON.stringify(targetMetersBySection)
+      );
+    } catch {
+      // ignore storage failures
+    }
+  }, [targetMetersBySection]);
 
   const selectedSourceData = useMemo(() => {
     const selected = sectionSeries.find((s) => s.id === sectionFilter);
@@ -252,34 +275,43 @@ export function MonthlyProgressChart({ data, historicData = [], sectionSeries = 
   const chartData = useMemo(() => {
     // Build daily target first, then aggregate to weeks if needed.
     let targetCum = 0;
+    let actualCum = 0;
+    const isGuideBased =
+      selectedSectionMeta?.guideBased &&
+      (selectedSectionMeta?.totalFittings ?? 0) > 0 &&
+      selectedSectionMeta?.startCh != null &&
+      selectedSectionMeta?.endCh != null;
+    const guideTotal = selectedSectionMeta?.totalFittings ?? 0;
+    const guideMetresPerFitting =
+      isGuideBased && guideTotal > 0
+        ? Math.abs((selectedSectionMeta?.endCh ?? 0) - (selectedSectionMeta?.startCh ?? 0)) / guideTotal
+        : PIPE_LENGTH_M;
+    const sectionTargetKey = sectionFilter || "__default__";
+    const defaultTargetMeters = Math.max(0, targetMetersBySection[sectionTargetKey] ?? PIPE_LENGTH_M);
     const daily = selectedSourceData.map((d) => {
-      const guideTotal = selectedSectionMeta?.totalFittings ?? 0;
       const rangeMatch = (settings.targetRanges ?? []).find(
         (r) => r.start && r.end && d.date >= r.start && d.date <= r.end
       );
-      const activeTargetPipes = isWaWorkingDay(d.date)
-        ? rangeMatch
-          ? rangeMatch.pipesPerDay
-          : pipesPerDay
-        : 0;
-      const targetMeters =
-        selectedSectionMeta?.guideBased &&
-        guideTotal > 0 &&
-        selectedSectionMeta.startCh != null &&
-        selectedSectionMeta.endCh != null
-          ? (activeTargetPipes / guideTotal) *
-            Math.abs(selectedSectionMeta.endCh - selectedSectionMeta.startCh)
-          : activeTargetPipes * PIPE_LENGTH_M;
+      const rangeTargetMeters =
+        rangeMatch != null
+          ? (isGuideBased ? rangeMatch.pipesPerDay * guideMetresPerFitting : rangeMatch.pipesPerDay * PIPE_LENGTH_M)
+          : defaultTargetMeters;
+      const targetMeters = isWaWorkingDay(d.date) ? rangeTargetMeters : 0;
       targetCum += targetMeters;
+      const fittingsForDay = d.pipeMetres / PIPE_LENGTH_M;
+      const actualMetersForDay = Math.round(fittingsForDay * guideMetresPerFitting * 10) / 10;
+      actualCum += actualMetersForDay;
       return {
         ...d,
+        pipeMetres: actualMetersForDay,
+        pipeMetresCumulative: Math.round(actualCum * 10) / 10,
         pipeTargetCumulative: Math.round(targetCum),
-        pipePipesPerDay: d.pipeMetres / PIPE_LENGTH_M,
+        pipePipesPerDay: fittingsForDay,
       };
     });
 
     return daily;
-  }, [selectedSourceData, pipesPerDay, settings.targetRanges, selectedSectionMeta]);
+  }, [selectedSourceData, sectionFilter, settings.targetRanges, selectedSectionMeta, targetMetersBySection]);
   const renderTooltip = (props: any) => {
     const { active, payload, label } = props as {
       active?: boolean;
@@ -523,23 +555,26 @@ export function MonthlyProgressChart({ data, historicData = [], sectionSeries = 
                 <div className="col-span-2">
                   <label
                     className="mb-1 block text-[11px] font-medium text-zinc-600"
-                    title="Set the daily target in number of pipes."
+                    title="Set the daily target in metres for this section."
                   >
-                    Default target ({settings.targetUnit})
+                    Default target (m/day) - per section
                   </label>
                   <input
                     type="number"
                     min={0}
                     step={0.5}
-                    value={pipesPerDay}
+                    value={Math.max(0, targetMetersBySection[sectionFilter || "__default__"] ?? PIPE_LENGTH_M)}
                     onChange={(e) =>
-                      setPipesPerDay(() => {
+                      setTargetMetersBySection((prev) => {
                         const v = Number(e.target.value);
-                        return Number.isFinite(v) && v >= 0 ? v : 0;
+                        return {
+                          ...prev,
+                          [sectionFilter || "__default__"]: Number.isFinite(v) && v >= 0 ? v : 0,
+                        };
                       })
                     }
                     className="h-8 w-28 rounded-md border border-border bg-white px-2 text-sm"
-                    title="Set the daily target in number of pipes."
+                    title="Set the daily target in metres for this section."
                   />
                 </div>
                 <div className="col-span-2">
@@ -645,7 +680,7 @@ export function MonthlyProgressChart({ data, historicData = [], sectionSeries = 
                               id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
                               start: data[0]?.date ?? "",
                               end: data[data.length - 1]?.date ?? "",
-                              pipesPerDay,
+                              pipesPerDay: 1,
                             },
                           ],
                         }))

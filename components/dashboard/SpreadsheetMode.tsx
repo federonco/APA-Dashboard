@@ -17,6 +17,7 @@ import {
 } from "@/lib/utils/spreadsheetFormat";
 
 const TABLE_MAX_H = 320;
+const TABLE_MIN_H = 220;
 
 type SpreadsheetModeProps = {
   data: SpreadsheetData;
@@ -182,8 +183,8 @@ export function SpreadsheetMode({ data, crew, referenceDate }: SpreadsheetModePr
           {expandedD && (
           <div
             ref={dRef}
-            className="overflow-auto rounded-lg border border-[#E3D4C6] bg-[#F3E8DC]"
-            style={{ maxHeight: TABLE_MAX_H }}
+            className="min-h-[220px] overflow-x-auto overflow-y-auto rounded-lg border border-[#E3D4C6] bg-[#F3E8DC]"
+            style={{ maxHeight: TABLE_MAX_H, minHeight: TABLE_MIN_H }}
           >
             <table className="w-full min-w-[400px] table-fixed">
               <thead>

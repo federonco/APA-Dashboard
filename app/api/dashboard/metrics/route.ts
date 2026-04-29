@@ -33,6 +33,8 @@ export async function GET(req: NextRequest) {
     metric_key: string;
     label: string;
     value: number;
+    secondary_value?: number;
+    tertiary_value?: number;
     value_text?: string;
     section_name: string | null;
     subsection_name: string | null;
@@ -71,45 +73,42 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-      const value = await computeMetricValue(row.metric_key as MetricKey, {
+      const isWeldWrap = row.metric_key === "weld_done" || row.metric_key === "wrap_done";
+      const valueMetricKey = isWeldWrap
+        ? ((row.metric_key === "weld_done" ? "weld_done_today" : "wrap_done_today") as MetricKey)
+        : (row.metric_key as MetricKey);
+      const value = await computeMetricValue(valueMetricKey, {
         sectionId: row.section_id,
         subsectionId: row.subsection_id,
         crewId: row.crew_id,
         dateStr: date,
       });
-      const required =
-        row.metric_key === "weld_done" || row.metric_key === "wrap_done"
-          ? await computeMetricValue("welds_required", {
+      const secondaryValue = isWeldWrap
+        ? await computeMetricValue(row.metric_key as MetricKey, {
+            sectionId: row.section_id,
+            subsectionId: row.subsection_id,
+            crewId: row.crew_id,
+            dateStr: date,
+          })
+        : undefined;
+      const tertiaryValue = isWeldWrap
+        ? await computeMetricValue(
+            (row.metric_key === "weld_done" ? "weld_cumulative" : "wrap_cumulative") as MetricKey,
+            {
               sectionId: row.section_id,
               subsectionId: row.subsection_id,
               crewId: row.crew_id,
               dateStr: date,
-            })
-          : null;
-      const weldCompletedForScope =
-        row.metric_key === "wrap_done"
-          ? await computeMetricValue("weld_done", {
-              sectionId: row.section_id,
-              subsectionId: row.subsection_id,
-              crewId: row.crew_id,
-              dateStr: date,
-            })
-          : null;
-      const pending =
-        row.metric_key === "wrap_done" && weldCompletedForScope != null
-          ? Math.max(weldCompletedForScope - value, 0)
-          : required != null
-            ? Math.max(required - value, 0)
-            : null;
+            }
+          )
+        : undefined;
       rows.push({
         id: row.id,
         metric_key: row.metric_key,
         label: row.label,
         value,
-        value_text:
-          required != null
-            ? `${value} / ${pending}`
-            : undefined,
+        secondary_value: secondaryValue,
+        tertiary_value: tertiaryValue,
         section_name: sectionName,
         subsection_name: subsectionName,
         crew_name: crewName,

@@ -8,6 +8,8 @@ export type MetricCardData = {
   metric_key: string;
   label: string;
   value: number;
+  secondary_value?: number;
+  tertiary_value?: number;
   value_text?: string;
   section_name: string | null;
   subsection_name?: string | null;
@@ -36,6 +38,19 @@ export function MetricCardItem({ card }: { card: MetricCardData }) {
       : Number.isInteger(card.value)
         ? String(card.value)
         : card.value.toLocaleString("en-AU", { maximumFractionDigits: 1 }));
+  const formattedSecondary =
+    card.secondary_value == null
+      ? null
+      : Number.isInteger(card.secondary_value)
+        ? String(card.secondary_value)
+        : card.secondary_value.toLocaleString("en-AU", { maximumFractionDigits: 1 });
+  const formattedTertiary =
+    card.tertiary_value == null
+      ? null
+      : Number.isInteger(card.tertiary_value)
+        ? String(card.tertiary_value)
+        : card.tertiary_value.toLocaleString("en-AU", { maximumFractionDigits: 1 });
+  const isWeldWrapCard = card.metric_key === "weld_done" || card.metric_key === "wrap_done";
 
   return (
     <div
@@ -56,9 +71,28 @@ export function MetricCardItem({ card }: { card: MetricCardData }) {
           </span>
         ) : null}
       </div>
-      <p className="text-2xl font-semibold tabular-nums" style={{ color: accent }}>
-        {formatted}
-      </p>
+      {isWeldWrapCard && formattedSecondary != null ? (
+        <div className="space-y-1">
+          <p className="text-2xl font-semibold tabular-nums" style={{ color: accent }}>
+            {formatted}
+          </p>
+          <p className="text-[11px] leading-tight" style={{ color: "#71717a" }}>
+            done today
+          </p>
+          <p className="text-sm tabular-nums" style={{ color: "#a1a1aa" }}>
+            {formattedSecondary} required
+          </p>
+          {formattedTertiary != null ? (
+            <p className="text-xs tabular-nums" style={{ color: "#a1a1aa" }}>
+              {formattedTertiary} {card.metric_key === "weld_done" ? "welded cumulative" : "wrapped cumulative"}
+            </p>
+          ) : null}
+        </div>
+      ) : (
+        <p className="text-2xl font-semibold tabular-nums" style={{ color: accent }}>
+          {formatted}
+        </p>
+      )}
       {sub ? (
         <p className="line-clamp-2 text-[10px] leading-tight" style={{ color: tokens.text.secondary }}>
           {sub}

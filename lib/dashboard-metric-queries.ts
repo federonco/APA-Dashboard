@@ -29,6 +29,15 @@ function monthBoundsPerth(anchorDate: string): { start: string; end: string } {
   };
 }
 
+function perthTodayUtcRange(): { startUTC: string; endUTC: string } {
+  const perthNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Australia/Perth" }));
+  const todayPerth = perthNow.toISOString().split("T")[0];
+  const tomorrowPerth = new Date(perthNow.getTime() + 86400000).toISOString().split("T")[0];
+  const startUTC = new Date(`${todayPerth}T00:00:00+08:00`).toISOString();
+  const endUTC = new Date(`${tomorrowPerth}T00:00:00+08:00`).toISOString();
+  return { startUTC, endUTC };
+}
+
 /** How to filter `drainer_pipe_records` for dashboard metrics (pipes / welds). */
 export type DrainerPipeScope =
   | { mode: "legacy_section_id"; value: string }
@@ -152,13 +161,51 @@ export async function computeMetricValue(
 
   const { sectionId, subsectionId, crewId, dateStr } = opts;
 
+  const resolveLegacySectionId = async (): Promise<string | null> => {
+    if (!sectionId) {
+      console.warn("[weld/wrap metric] missing section_id", { metric_key: metricKey, section_id: sectionId });
+      return null;
+    }
+    const { data: sec, error } = await admin
+      .from("sections")
+      .select("app_config")
+      .eq("id", sectionId)
+      .maybeSingle();
+    if (error) {
+      console.warn("[weld/wrap metric] failed to resolve legacy_id", {
+        metric_key: metricKey,
+        section_id: sectionId,
+        error: error.message,
+      });
+      return null;
+    }
+    const cfg = (sec?.app_config as Record<string, unknown> | null) ?? null;
+    const legacySectionId =
+      cfg?.legacy_id != null && String(cfg.legacy_id).trim() !== ""
+        ? String(cfg.legacy_id).trim()
+        : null;
+    if (!legacySectionId) {
+      console.warn("[weld/wrap metric] legacySectionId missing", {
+        metric_key: metricKey,
+        section_id: sectionId,
+        legacySectionId,
+      });
+      return null;
+    }
+    return legacySectionId;
+  };
+
   const pipeScope =
     metricKey === "pipes_today" ||
     metricKey === "pipes_this_month" ||
     metricKey === "pipes_total" ||
     metricKey === "welds_required" ||
     metricKey === "weld_done" ||
-    metricKey === "wrap_done"
+    metricKey === "weld_done_today" ||
+    metricKey === "weld_cumulative" ||
+    metricKey === "wrap_done" ||
+    metricKey === "wrap_done_today" ||
+    metricKey === "wrap_cumulative"
       ? await resolveDrainerScopeForCard(admin, { sectionId, subsectionId })
       : null;
 
@@ -254,58 +301,137 @@ export async function computeMetricValue(
       return count ?? 0;
     }
     case "weld_done": {
-      if (!pipeScope) return 0;
-      let q = admin
+      const legacySectionId = await resolveLegacySectionId();
+      if (!legacySectionId) return 0;
+      const { data: rows, error } = await admin
         .from("drainer_pipe_records")
-        .select(
-          "joint_type,welded_at,weld_step_e1_at,weld_step_e2_at,weld_step_i1_at,weld_step_i2_at,welded_steps"
-        )
-        .in("joint_type", ["WR", "WB"]);
-      q = applyDrainerPipeScope(q, pipeScope);
-      const { data, error } = await q;
+        .select("joint_type, welded_at, weld_step_e1_at, weld_step_e2_at, weld_step_i1_at, weld_step_i2_at")
+        .eq("section_id", legacySectionId)
+        .in("joint_type", ["WR", "WB", "Transition+WR"]);
       if (error) throw error;
-      const rows =
-        (data as Array<{
-          joint_type: string | null;
-          welded_at: string | null;
+      const weldUnits = (rows ?? []).reduce((sum, row) => {
+        const r = row as {
+          joint_type?: string | null;
+          welded_at?: string | null;
           weld_step_e1_at?: string | null;
           weld_step_e2_at?: string | null;
           weld_step_i1_at?: string | null;
           weld_step_i2_at?: string | null;
-          welded_steps?: {
-            external_1?: string | null;
-            external_2?: string | null;
-            internal_1?: string | null;
-            internal_2?: string | null;
-          } | null;
-        }> | null) ?? [];
-      return rows.filter((row) => {
-        if (row.joint_type === "WR") return !!row.welded_at;
-        if (row.joint_type === "WB") {
-          const fromColumns =
-            !!row.weld_step_e1_at &&
-            !!row.weld_step_e2_at &&
-            !!row.weld_step_i1_at &&
-            !!row.weld_step_i2_at;
-          const fromJson =
-            !!row.welded_steps?.external_1 &&
-            !!row.welded_steps?.external_2 &&
-            !!row.welded_steps?.internal_1 &&
-            !!row.welded_steps?.internal_2;
-          return fromColumns || fromJson || !!row.welded_at;
+        };
+        if (r.joint_type === "WB") {
+          const pending = [
+            r.weld_step_e1_at,
+            r.weld_step_e2_at,
+            r.weld_step_i1_at,
+            r.weld_step_i2_at,
+          ].filter((step) => step == null).length;
+          return sum + pending;
         }
-        return false;
-      }).length;
+        return r.welded_at == null ? sum + 1 : sum;
+      }, 0);
+      return weldUnits;
+    }
+    case "weld_done_today": {
+      const legacySectionId = await resolveLegacySectionId();
+      if (!legacySectionId) return 0;
+      const { startUTC, endUTC } = perthTodayUtcRange();
+      const { data: rows, error } = await admin
+        .from("drainer_pipe_records")
+        .select("joint_type, welded_at, weld_step_e1_at, weld_step_e2_at, weld_step_i1_at, weld_step_i2_at")
+        .eq("section_id", legacySectionId)
+        .in("joint_type", ["WR", "WB", "Transition+WR"]);
+      if (error) throw error;
+      const weldUnits = (rows ?? []).reduce((sum, row) => {
+        const r = row as {
+          joint_type?: string | null;
+          welded_at?: string | null;
+          weld_step_e1_at?: string | null;
+          weld_step_e2_at?: string | null;
+          weld_step_i1_at?: string | null;
+          weld_step_i2_at?: string | null;
+        };
+        if (r.joint_type === "WB") {
+          const completedToday = [
+            r.weld_step_e1_at,
+            r.weld_step_e2_at,
+            r.weld_step_i1_at,
+            r.weld_step_i2_at,
+          ].filter((step) => step != null && step >= startUTC && step < endUTC).length;
+          return sum + completedToday;
+        }
+        if (r.welded_at != null && r.welded_at >= startUTC && r.welded_at < endUTC) {
+          return sum + 1;
+        }
+        return sum;
+      }, 0);
+      return weldUnits;
     }
     case "wrap_done": {
-      if (!pipeScope) return 0;
-      let q = admin
+      const legacySectionId = await resolveLegacySectionId();
+      if (!legacySectionId) return 0;
+      const { count, error } = await admin
         .from("drainer_pipe_records")
         .select("id", { count: "exact", head: true })
-        .in("joint_type", ["WR", "WB"])
+        .eq("section_id", legacySectionId)
+        .in("joint_type", ["WR", "Transition+WR"])
+        .not("welded_at", "is", null)
+        .is("wrapped_at", null);
+      if (error) throw error;
+      return count ?? 0;
+    }
+    case "wrap_done_today": {
+      const legacySectionId = await resolveLegacySectionId();
+      if (!legacySectionId) return 0;
+      const { startUTC, endUTC } = perthTodayUtcRange();
+      const { count, error } = await admin
+        .from("drainer_pipe_records")
+        .select("id", { count: "exact", head: true })
+        .eq("section_id", legacySectionId)
+        .in("joint_type", ["WR", "Transition+WR"])
+        .gte("wrapped_at", startUTC)
+        .lt("wrapped_at", endUTC);
+      if (error) throw error;
+      return count ?? 0;
+    }
+    case "weld_cumulative": {
+      const legacySectionId = await resolveLegacySectionId();
+      if (!legacySectionId) return 0;
+      const { data: rows, error } = await admin
+        .from("drainer_pipe_records")
+        .select("joint_type, welded_at, weld_step_e1_at, weld_step_e2_at, weld_step_i1_at, weld_step_i2_at")
+        .eq("section_id", legacySectionId)
+        .in("joint_type", ["WR", "WB", "Transition+WR"]);
+      if (error) throw error;
+      return (rows ?? []).reduce((sum, row) => {
+        const r = row as {
+          joint_type?: string | null;
+          welded_at?: string | null;
+          weld_step_e1_at?: string | null;
+          weld_step_e2_at?: string | null;
+          weld_step_i1_at?: string | null;
+          weld_step_i2_at?: string | null;
+        };
+        if (r.joint_type === "WB") {
+          const done = [
+            r.weld_step_e1_at,
+            r.weld_step_e2_at,
+            r.weld_step_i1_at,
+            r.weld_step_i2_at,
+          ].filter((step) => step != null).length;
+          return sum + done;
+        }
+        return r.welded_at != null ? sum + 1 : sum;
+      }, 0);
+    }
+    case "wrap_cumulative": {
+      const legacySectionId = await resolveLegacySectionId();
+      if (!legacySectionId) return 0;
+      const { count, error } = await admin
+        .from("drainer_pipe_records")
+        .select("id", { count: "exact", head: true })
+        .eq("section_id", legacySectionId)
+        .in("joint_type", ["WR", "Transition+WR"])
         .not("wrapped_at", "is", null);
-      q = applyDrainerPipeScope(q, pipeScope);
-      const { count, error } = await q;
       if (error) throw error;
       return count ?? 0;
     }

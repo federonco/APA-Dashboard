@@ -419,9 +419,12 @@ export function AddCardWizard({
                 className="text-sm text-zinc-600"
                 onClick={() => {
                   if (!cat) return;
-                  if (cat.requiresCrew) setStep(4);
-                  else if (cat.allowsSubsection) setStep(3);
-                  else if (cat.requiresSection) setStep(2);
+                  const requiresCrew = !!cat.requiresCrew;
+                  const allowsSubsection = !!cat.allowsSubsection;
+                  const requiresSection = !!cat.requiresSection;
+                  if (requiresCrew) setStep(4);
+                  else if (allowsSubsection) setStep(3);
+                  else if (requiresSection) setStep(2);
                   else setStep(1);
                 }}
               >

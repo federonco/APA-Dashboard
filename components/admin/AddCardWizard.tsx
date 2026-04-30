@@ -138,7 +138,7 @@ export function AddCardWizard({
 
   function nextFromSection() {
     if (!cat) return;
-    if (cat.allowsSubsection && subsections.length > 0) setStep(3);
+    if (cat.allowsSubsection) setStep(3);
     else if (cat.requiresCrew) setStep(4);
     else setStep(5);
   }
@@ -375,7 +375,7 @@ export function AddCardWizard({
                 type="button"
                 className="text-sm text-zinc-600"
                 onClick={() => {
-                  if (cat?.allowsSubsection && subsections.length > 0) setStep(3);
+                  if (cat?.allowsSubsection) setStep(3);
                   else if (cat?.requiresSection) setStep(2);
                   else setStep(1);
                 }}
@@ -420,7 +420,7 @@ export function AddCardWizard({
                 onClick={() => {
                   if (!cat) return;
                   if (cat.requiresCrew) setStep(4);
-                  else if (cat.allowsSubsection && subsections.length > 0) setStep(3);
+                  else if (cat.allowsSubsection) setStep(3);
                   else if (cat.requiresSection) setStep(2);
                   else setStep(1);
                 }}

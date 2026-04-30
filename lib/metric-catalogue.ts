@@ -170,5 +170,11 @@ export function categoryLabel(cat: MetricCategory): string {
   return CATEGORY_LABEL[cat] ?? cat;
 }
 
-const WIZARD_SKIP = new Set<string>(["welds_required"]);
+const WIZARD_SKIP = new Set<string>([
+  "welds_required",
+  "weld_done_today",
+  "weld_cumulative",
+  "wrap_done_today",
+  "wrap_cumulative",
+]);
 export const METRICS_IN_ADMIN_WIZARD = METRIC_CATALOGUE.filter((m) => !WIZARD_SKIP.has(m.key));

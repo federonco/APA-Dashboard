@@ -136,6 +136,10 @@ export function MonthlyProgressChart({ data, historicData = [], sectionSeries = 
     targetUnit: "Pipe/Fitting",
     targetRanges: [],
   }));
+  const [draftColors, setDraftColors] = useState<{ pipe: string; target: string }>({
+    pipe: "#f97316",
+    target: tokens.text.muted,
+  });
 
   useEffect(() => {
     const parsed = safeParseSettings(
@@ -144,6 +148,13 @@ export function MonthlyProgressChart({ data, historicData = [], sectionSeries = 
     if (!parsed) return;
     setSettings(parsed);
   }, []);
+
+  useEffect(() => {
+    setDraftColors({
+      pipe: settings.pipe.color,
+      target: settings.target.color,
+    });
+  }, [settings.pipe.color, settings.target.color]);
 
   useEffect(() => {
     try {
@@ -552,146 +563,6 @@ export function MonthlyProgressChart({ data, historicData = [], sectionSeries = 
               className="absolute right-0 top-10 z-[9999] w-[520px] max-w-[min(90vw,520px)] rounded-lg border border-border bg-card p-3 shadow-lg"
             >
               <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2">
-                  <label
-                    className="mb-1 block text-[11px] font-medium text-zinc-600"
-                    title="Set the daily target in metres for this section."
-                  >
-                    Default target (m/day) - per section
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    step={0.5}
-                    value={Math.max(0, targetMetersBySection[sectionFilter || "__default__"] ?? PIPE_LENGTH_M)}
-                    onChange={(e) =>
-                      setTargetMetersBySection((prev) => {
-                        const v = Number(e.target.value);
-                        return {
-                          ...prev,
-                          [sectionFilter || "__default__"]: Number.isFinite(v) && v >= 0 ? v : 0,
-                        };
-                      })
-                    }
-                    className="h-8 w-28 rounded-md border border-border bg-white px-2 text-sm"
-                    title="Set the daily target in metres for this section."
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label
-                    className="mb-1 block text-[11px] font-medium text-zinc-600"
-                    title="Edit unit shown for target."
-                  >
-                    Unit to measure
-                  </label>
-                  <input
-                    className="h-8 w-full rounded-md border border-border bg-white px-2 text-sm"
-                    value={settings.targetUnit}
-                    onChange={(e) =>
-                      setSettings((s) => ({
-                        ...s,
-                        targetUnit: e.target.value || "Pipe/Fitting",
-                      }))
-                    }
-                    placeholder="Pipe/Fitting"
-                    title="Edit unit shown for target."
-                  />
-                </div>
-                <div className="col-span-2 rounded-md border border-border bg-white/70 p-2">
-                  <div className="mb-2 text-[11px] font-medium text-zinc-700" title="Optional target schedule by date range.">
-                    Target ranges (date-based)
-                  </div>
-                  <div className="space-y-2">
-                    {(settings.targetRanges ?? []).map((r) => (
-                      <div key={r.id} className="flex flex-wrap items-center gap-2">
-                        <input
-                          type="date"
-                          className="h-8 rounded-md border border-border bg-white px-2 text-xs"
-                          value={r.start}
-                          onChange={(e) =>
-                            setSettings((s) => ({
-                              ...s,
-                              targetRanges: (s.targetRanges ?? []).map((x) =>
-                                x.id === r.id ? { ...x, start: e.target.value } : x
-                              ),
-                            }))
-                          }
-                          title="Range start date (inclusive)."
-                        />
-                        <input
-                          type="date"
-                          className="h-8 rounded-md border border-border bg-white px-2 text-xs"
-                          value={r.end}
-                          onChange={(e) =>
-                            setSettings((s) => ({
-                              ...s,
-                              targetRanges: (s.targetRanges ?? []).map((x) =>
-                                x.id === r.id ? { ...x, end: e.target.value } : x
-                              ),
-                            }))
-                          }
-                          title="Range end date (inclusive)."
-                        />
-                        <input
-                          type="number"
-                          min={0}
-                          step={0.5}
-                          className="h-8 w-24 rounded-md border border-border bg-white px-2 text-xs"
-                          value={r.pipesPerDay}
-                          onChange={(e) =>
-                            setSettings((s) => ({
-                              ...s,
-                              targetRanges: (s.targetRanges ?? []).map((x) =>
-                                x.id === r.id
-                                  ? {
-                                      ...x,
-                                      pipesPerDay: Math.max(0, Number(e.target.value) || 0),
-                                    }
-                                  : x
-                              ),
-                            }))
-                          }
-                          title="Target pipes per day for this range."
-                        />
-                        <button
-                          type="button"
-                          className="h-8 rounded-md border border-border bg-card px-2 text-xs text-zinc-700 hover:bg-muted"
-                          onClick={() =>
-                            setSettings((s) => ({
-                              ...s,
-                              targetRanges: (s.targetRanges ?? []).filter((x) => x.id !== r.id),
-                            }))
-                          }
-                          title="Remove this target range."
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ))}
-                    <button
-                      type="button"
-                      className="h-8 rounded-md border border-border bg-card px-2 text-xs font-medium text-zinc-700 hover:bg-muted"
-                      onClick={() =>
-                        setSettings((s) => ({
-                          ...s,
-                          targetRanges: [
-                            ...(s.targetRanges ?? []),
-                            {
-                              id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-                              start: data[0]?.date ?? "",
-                              end: data[data.length - 1]?.date ?? "",
-                              pipesPerDay: 1,
-                            },
-                          ],
-                        }))
-                      }
-                      title="Add a date range with custom target."
-                    >
-                      + Add range
-                    </button>
-                  </div>
-                </div>
-
                 {([
                   ["Pipe laid", "pipe"] as const,
                   ["Target", "target"] as const,
@@ -703,67 +574,55 @@ export function MonthlyProgressChart({ data, historicData = [], sectionSeries = 
                     <div className="flex flex-wrap items-center gap-2">
                       <input
                         type="color"
-                        value={settings[key].color}
-                        onChange={(e) =>
-                          setSettings((s) => ({
-                            ...s,
-                            [key]: { ...s[key], color: e.target.value },
-                          }))
-                        }
+                        value={draftColors[key]}
+                        onChange={(e) => setDraftColors((prev) => ({ ...prev, [key]: e.target.value }))}
                         className="h-8 w-10 rounded-md border border-border bg-white p-1"
                         aria-label={`${label} color`}
                         title={`Change ${label} line color.`}
                       />
-                      <input
-                        type="number"
-                        min={1}
-                        step={1}
-                        value={settings[key].width}
-                        onChange={(e) =>
-                          setSettings((s) => ({
-                            ...s,
-                            [key]: {
-                              ...s[key],
-                              width: Math.max(1, Number(e.target.value) || 1),
-                            },
-                          }))
-                        }
-                        className="h-8 w-20 rounded-md border border-border bg-white px-2 text-sm"
-                        aria-label={`${label} stroke width`}
-                        title={`Change ${label} line thickness.`}
-                      />
-                      <input
-                        value={settings[key].dash}
-                        onChange={(e) =>
-                          setSettings((s) => ({
-                            ...s,
-                            [key]: { ...s[key], dash: e.target.value },
-                          }))
-                        }
-                        className="h-8 w-44 rounded-md border border-border bg-white px-2 text-sm"
-                        aria-label={`${label} dash pattern`}
-                        placeholder='Dash (e.g. "4 4")'
-                        title={`Change ${label} line dash pattern (empty means solid).`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setSettings((s) => ({
-                            ...s,
-                            [key]:
-                              key === "pipe"
-                                ? { color: "#f97316", width: chartLineVisual.strokeWidth, dash: "" }
-                                : { color: tokens.text.muted, width: chartLineVisual.targetStrokeWidth, dash: "4 4" },
-                          }))
-                        }
-                        className="h-8 rounded-md border border-border bg-card px-2 text-xs font-medium text-zinc-700 hover:bg-muted"
-                        title={`Reset ${label} style to default.`}
-                      >
-                        Reset
-                      </button>
                     </div>
                   </div>
                 ))}
+                  <div className="col-span-2 mt-1 flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      className="h-8 rounded-md border border-border bg-card px-3 text-xs font-medium text-zinc-700 hover:bg-muted"
+                      onClick={() =>
+                        setDraftColors({
+                          pipe: settings.pipe.color,
+                          target: settings.target.color,
+                        })
+                      }
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      className="h-8 rounded-md border border-border bg-card px-3 text-xs font-medium text-zinc-700 hover:bg-muted"
+                      onClick={() =>
+                        setDraftColors({
+                          pipe: "#f97316",
+                          target: tokens.text.muted,
+                        })
+                      }
+                    >
+                      Reset
+                    </button>
+                    <button
+                      type="button"
+                      className="h-8 rounded-md bg-[#B96A2D] px-3 text-xs font-semibold text-white hover:opacity-95"
+                      onClick={() => {
+                        setSettings((s) => ({
+                          ...s,
+                          pipe: { ...s.pipe, color: draftColors.pipe },
+                          target: { ...s.target, color: draftColors.target },
+                        }));
+                        setEditorOpen(false);
+                      }}
+                    >
+                      Aplicar cambios
+                    </button>
+                  </div>
               </div>
             </div>
           )}
@@ -802,9 +661,9 @@ export function MonthlyProgressChart({ data, historicData = [], sectionSeries = 
                 type="monotone"
                 dataKey="pipeTargetCumulative"
                 name="Projected"
-                stroke="#94a3b8"
-                strokeWidth={1.5}
-                strokeDasharray="6 4"
+                stroke={settings.target.color}
+                strokeWidth={settings.target.width}
+                strokeDasharray={settings.target.dash || "6 4"}
                 dot={false}
                 activeDot={false}
                 connectNulls
@@ -836,14 +695,14 @@ export function MonthlyProgressChart({ data, historicData = [], sectionSeries = 
         </div>
         <div className="mt-2 ml-1 flex shrink-0 items-center gap-5 pt-3">
           <div className="flex items-center gap-2">
-            <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: "#f97316" }} />
+            <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: settings.pipe.color }} />
             <span className="text-xs text-zinc-500" style={{ fontFamily: "var(--font-dm-mono), monospace" }}>
               Pipe laid
             </span>
           </div>
           <div className="flex items-center gap-2">
             <svg width="20" height="10" className="overflow-visible">
-              <line x1="0" y1="5" x2="20" y2="5" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="5 3" />
+              <line x1="0" y1="5" x2="20" y2="5" stroke={settings.target.color} strokeWidth="1.5" strokeDasharray="5 3" />
             </svg>
             <span className="text-xs text-zinc-400 italic" style={{ fontFamily: "var(--font-dm-mono), monospace" }}>
               Projected

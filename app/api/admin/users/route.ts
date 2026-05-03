@@ -222,5 +222,5 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, user_id: uid, added: toInsert.length });
+  return NextResponse.json({ ok: true, user_id: uid });
 }

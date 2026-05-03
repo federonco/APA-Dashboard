@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { GroupedAdmin } from "@/app/api/admin/users/route";
+import { APP_ASSIGNMENT_INSERT_ROLE } from "@/lib/user-app-roles";
 import { tokens } from "@/lib/designTokens";
 
 type SectionOption = {
@@ -11,9 +12,12 @@ type SectionOption = {
   crew_name: string | null;
 };
 
+type AppOption = { id: string; name: string };
+
 export function AdminUsersManager({ currentUserId }: { currentUserId: string }) {
   const [rows, setRows] = useState<GroupedAdmin[]>([]);
   const [sections, setSections] = useState<SectionOption[]>([]);
+  const [apps, setApps] = useState<AppOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -25,6 +29,7 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [selectedSections, setSelectedSections] = useState<Set<string>>(new Set());
+  const [selectedApps, setSelectedApps] = useState<Set<string>>(new Set());
 
   const [saving, setSaving] = useState(false);
 
@@ -37,9 +42,10 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
     setLoading(true);
     setError(null);
     try {
-      const [uRes, sRes] = await Promise.all([
+      const [uRes, sRes, aRes] = await Promise.all([
         fetch("/api/admin/users", { credentials: "include" }),
         fetch("/api/admin/sections", { credentials: "include" }),
+        fetch("/api/admin/apps", { credentials: "include" }),
       ]);
       if (!uRes.ok) {
         const d = await uRes.json().catch(() => ({}));
@@ -49,10 +55,16 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
         const d = await sRes.json().catch(() => ({}));
         throw new Error(d?.error ?? "Failed to load sections");
       }
+      if (!aRes.ok) {
+        const d = await aRes.json().catch(() => ({}));
+        throw new Error(d?.error ?? "Failed to load applications");
+      }
       const uData = (await uRes.json()) as GroupedAdmin[];
       const sData = (await sRes.json()) as SectionOption[];
+      const aData = (await aRes.json()) as AppOption[];
       setRows(uData);
       setSections(sData);
+      setApps(aData);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
     } finally {
@@ -73,10 +85,20 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
     });
   };
 
+  const toggleApp = (id: string) => {
+    setSelectedApps((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  };
+
   const openCreate = () => {
     setEmail("");
     setPassword("");
     setSelectedSections(new Set());
+    setSelectedApps(new Set());
     setCreateOpen(true);
   };
 
@@ -84,21 +106,29 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
     setEditUser(g);
     setPassword("");
     setSelectedSections(new Set(g.sections.map((s) => s.id).filter(Boolean) as string[]));
+    setSelectedApps(new Set((g.apps ?? []).map((a) => a.app_id)));
   };
 
   const handleCreate = async () => {
     setSaving(true);
     setError(null);
     try {
+      const app_assignments = [...selectedApps].map((app_id) => ({
+        app_id,
+        role: APP_ASSIGNMENT_INSERT_ROLE,
+      }));
+      const payload = {
+        email,
+        password,
+        section_ids: [...selectedSections],
+        app_assignments,
+      };
+      console.log("USER ASSIGNMENT PAYLOAD:", payload);
       const res = await fetch("/api/admin/users", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          password,
-          section_ids: [...selectedSections],
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -120,12 +150,22 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
     setSaving(true);
     setError(null);
     try {
-      const payload: { section_ids: string[]; password?: string } = {
+      const app_assignments = [...selectedApps].map((app_id) => ({
+        app_id,
+        role: APP_ASSIGNMENT_INSERT_ROLE,
+      }));
+      const payload: {
+        section_ids: string[];
+        app_assignments: { app_id: string; role: string }[];
+        password?: string;
+      } = {
         section_ids: [...selectedSections],
+        app_assignments,
       };
       if (password.trim().length >= 6) {
         payload.password = password.trim();
       }
+      console.log("USER ASSIGNMENT PAYLOAD:", payload);
       const res = await fetch(`/api/admin/users/${editUser.user_id}`, {
         method: "PATCH",
         credentials: "include",
@@ -192,6 +232,7 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
   };
 
   const sectionsById = useMemo(() => new Map(sections.map((s) => [s.id, s])), [sections]);
+  const appLabelById = useMemo(() => new Map(apps.map((a) => [a.id, a.name])), [apps]);
 
   return (
     <div className="space-y-6">
@@ -241,7 +282,7 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm" style={{ color: "#3f3f46" }}>
+            <table className="w-full min-w-[880px] text-sm" style={{ color: "#3f3f46" }}>
               <thead>
                 <tr style={{ background: "#F7F7F7", borderBottom: `1px solid ${tokens.theme.border}` }}>
                   <th className="px-4 py-3 text-left text-[11px] font-medium uppercase" style={{ color: "#71717a" }}>
@@ -252,6 +293,9 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
                   </th>
                   <th className="px-4 py-3 text-left text-[11px] font-medium uppercase" style={{ color: "#71717a" }}>
                     Sections
+                  </th>
+                  <th className="px-4 py-3 text-left text-[11px] font-medium uppercase" style={{ color: "#71717a" }}>
+                    Applications
                   </th>
                   <th className="px-4 py-3 text-left text-[11px] font-medium uppercase" style={{ color: "#71717a" }}>
                     Created
@@ -270,6 +314,13 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
                       {g.sections.length > 0
                         ? g.sections.map((s) => s.name ?? s.id).join(", ")
                         : g.crew_label ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-xs" style={{ color: "#71717a" }}>
+                      {(g.apps ?? []).length > 0
+                        ? (g.apps ?? [])
+                            .map((a) => appLabelById.get(a.app_id) ?? a.app_id)
+                            .join(", ")
+                        : "—"}
                     </td>
                     <td className="px-4 py-3 text-xs" style={{ color: "#71717a" }}>
                       {formatDate(g.created_at)}
@@ -309,7 +360,7 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
       {createOpen && (
         <Modal title="New administrator" onClose={() => !saving && setCreateOpen(false)}>
           <p className="mb-3 text-xs" style={{ color: "#71717a" }}>
-            If the email already exists, only sections will be assigned (no new auth user).
+            If the email already exists, only sections/apps will be assigned (no new auth user).
           </p>
           <label className="mb-1 block text-[11px] font-medium uppercase" style={{ color: "#71717a" }}>
             Email
@@ -352,6 +403,36 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
               </label>
             ))}
           </div>
+          <p className="mb-2 text-[11px] font-medium uppercase" style={{ color: "#71717a" }}>
+            Applications (role: admin)
+          </p>
+          <p className="mb-3 text-xs" style={{ color: "#71717a" }}>
+            App access uses <code className="rounded bg-zinc-100 px-1">app_id</code> and{" "}
+            <code className="rounded bg-zinc-100 px-1">section_id</code> null.
+          </p>
+          <div className="mb-4 max-h-36 space-y-2 overflow-y-auto rounded border p-2" style={{ borderColor: "#E2E0E6" }}>
+            {apps.length === 0 ? (
+              <p className="text-xs" style={{ color: "#9ca3af" }}>
+                No applications in public.apps.
+              </p>
+            ) : (
+              apps.map((a) => (
+                <label key={a.id} className="flex cursor-pointer items-start gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={selectedApps.has(a.id)}
+                    onChange={() => toggleApp(a.id)}
+                  />
+                  <span>
+                    {a.name}
+                    <span className="ml-1" style={{ color: "#9ca3af" }}>
+                      ({a.id})
+                    </span>
+                  </span>
+                </label>
+              ))
+            )}
+          </div>
           <div className="flex justify-end gap-2">
             <button
               type="button"
@@ -366,7 +447,11 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
               type="button"
               className="rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
               style={{ background: "#B96A2D" }}
-              disabled={saving || !email.trim() || selectedSections.size === 0}
+              disabled={
+                saving ||
+                !email.trim() ||
+                (selectedSections.size === 0 && selectedApps.size === 0)
+              }
               onClick={() => void handleCreate()}
             >
               {saving ? "Saving…" : "Create"}
@@ -411,6 +496,32 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
               </label>
             ))}
           </div>
+          <p className="mb-3 text-[11px] font-medium uppercase" style={{ color: "#71717a" }}>
+            Applications (role: admin)
+          </p>
+          <div className="mb-4 max-h-36 space-y-2 overflow-y-auto rounded border p-2" style={{ borderColor: "#E2E0E6" }}>
+            {apps.length === 0 ? (
+              <p className="text-xs" style={{ color: "#9ca3af" }}>
+                No applications in public.apps.
+              </p>
+            ) : (
+              apps.map((a) => (
+                <label key={a.id} className="flex cursor-pointer items-start gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={selectedApps.has(a.id)}
+                    onChange={() => toggleApp(a.id)}
+                  />
+                  <span>
+                    {a.name}
+                    <span className="ml-1" style={{ color: "#9ca3af" }}>
+                      ({a.id})
+                    </span>
+                  </span>
+                </label>
+              ))
+            )}
+          </div>
           <div className="flex justify-end gap-2">
             <button
               type="button"
@@ -425,7 +536,9 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
               type="button"
               className="rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
               style={{ background: "#B96A2D" }}
-              disabled={saving}
+              disabled={
+                saving || (selectedSections.size === 0 && selectedApps.size === 0)
+              }
               onClick={() => void handleSaveEdit()}
             >
               {saving ? "Saving…" : "Save"}

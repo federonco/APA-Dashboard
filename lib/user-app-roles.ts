@@ -26,3 +26,6 @@ export function getSectionAssignmentRolesForQuery(): readonly string[] {
   const set = new Set<string>([current, LEGACY_SECTION_ADMIN_ROLE, DEFAULT_SECTION_INSERT_ROLE]);
   return [...set];
 }
+
+/** Fixed role for app-scoped rows (`app_id` set, `section_id` null). Only value exposed in admin UI. */
+export const APP_ASSIGNMENT_INSERT_ROLE = "admin" as const;

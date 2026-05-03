@@ -2,9 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminClient } from "@/lib/supabase/admin";
 import { requireSuperAdminJson } from "@/lib/admin-api-auth";
 import {
+  APP_ASSIGNMENT_INSERT_ROLE,
   getSectionAssignmentInsertRole,
   getSectionAssignmentRolesForQuery,
 } from "@/lib/user-app-roles";
+import {
+  isValidUserAppRoleInsertRow,
+  resolveSectionAppPairsForInsert,
+} from "@/lib/resolve-section-app-ids";
 
 export async function PATCH(
   req: NextRequest,
@@ -20,7 +25,12 @@ export async function PATCH(
     return NextResponse.json({ error: "Missing id" }, { status: 400 });
   }
 
-  let body: { section_ids?: string[]; password?: string; role?: string };
+  let body: {
+    section_ids?: string[];
+    app_assignments?: { app_id?: string }[];
+    password?: string;
+    role?: string;
+  };
   try {
     body = await req.json();
   } catch {
@@ -30,9 +40,10 @@ export async function PATCH(
   if (process.env.DEBUG_USER_APP_ROLES === "1") {
     console.log("[api/admin/users PATCH] REQUEST BODY:", {
       section_ids: body.section_ids,
+      app_assignments: body.app_assignments,
       has_password: body.password !== undefined,
       role_from_client: body.role ?? "(omitted — not used)",
-      role_used_for_insert: getSectionAssignmentInsertRole(),
+      role_used_for_section_insert: getSectionAssignmentInsertRole(),
     });
   }
 
@@ -76,17 +87,83 @@ export async function PATCH(
         email = (u.user?.email ?? "").trim();
       }
 
+      const resolved = await resolveSectionAppPairsForInsert(admin, sectionIds);
+      if (!resolved.ok) {
+        return NextResponse.json({ error: resolved.message }, { status: 400 });
+      }
+
       const insertRole = getSectionAssignmentInsertRole();
-      const inserts = sectionIds.map((section_id) => ({
+      const rows = resolved.pairs.map((p) => ({
         user_id: userId,
         user_email: email || null,
         role: insertRole,
-        section_id,
+        section_id: p.section_id,
+        app_id: p.app_id,
       }));
-
-      const { error: insErr } = await admin.from("user_app_roles").insert(inserts);
+      const rowsToInsert = rows.filter(isValidUserAppRoleInsertRow);
+      if (rowsToInsert.length === 0) {
+        return NextResponse.json({ error: "No valid section rows to insert" }, { status: 400 });
+      }
+      console.log("USER_APP_ROLE_ROWS_TO_INSERT:", rowsToInsert);
+      const { error: insErr } = await admin.from("user_app_roles").insert(rowsToInsert);
       if (insErr) {
         return NextResponse.json({ error: insErr.message }, { status: 500 });
+      }
+    }
+  }
+
+  if (body.app_assignments !== undefined) {
+    const raw = Array.isArray(body.app_assignments) ? body.app_assignments : [];
+    const appAssignments: { app_id: string; role: string }[] = [];
+    for (const a of raw) {
+      const aid = String(a?.app_id ?? "").trim();
+      if (!aid) continue;
+      appAssignments.push({ app_id: aid, role: APP_ASSIGNMENT_INSERT_ROLE });
+    }
+    const ids = new Set(appAssignments.map((x) => x.app_id));
+    if (ids.size !== appAssignments.length) {
+      return NextResponse.json({ error: "Duplicate app_id in app_assignments" }, { status: 400 });
+    }
+
+    const { error: delAppErr } = await admin
+      .from("user_app_roles")
+      .delete()
+      .eq("user_id", userId)
+      .is("section_id", null)
+      .not("app_id", "is", null);
+    if (delAppErr) {
+      return NextResponse.json({ error: delAppErr.message }, { status: 500 });
+    }
+
+    if (appAssignments.length > 0) {
+      let email = "";
+      const { data: profile } = await admin
+        .from("user_app_roles")
+        .select("user_email")
+        .eq("user_id", userId)
+        .limit(1)
+        .maybeSingle();
+      email = (profile as { user_email?: string } | null)?.user_email?.trim() ?? "";
+      if (!email) {
+        const { data: u } = await admin.auth.admin.getUserById(userId);
+        email = (u.user?.email ?? "").trim();
+      }
+
+      const rows = appAssignments.map((a) => ({
+        user_id: userId,
+        user_email: email || null,
+        role: a.role,
+        section_id: null,
+        app_id: a.app_id,
+      }));
+      const rowsToInsert = rows.filter(isValidUserAppRoleInsertRow);
+      if (rowsToInsert.length === 0) {
+        return NextResponse.json({ error: "No valid app assignments to insert" }, { status: 400 });
+      }
+      console.log("USER_APP_ROLE_ROWS_TO_INSERT:", rowsToInsert);
+      const { error: insAppErr } = await admin.from("user_app_roles").insert(rowsToInsert);
+      if (insAppErr) {
+        return NextResponse.json({ error: insAppErr.message }, { status: 500 });
       }
     }
   }
@@ -118,7 +195,7 @@ export async function DELETE(
     .from("user_app_roles")
     .delete()
     .eq("user_id", userId)
-    .in("role", ["section_admin", "admin"]);
+    .neq("role", "super_admin");
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

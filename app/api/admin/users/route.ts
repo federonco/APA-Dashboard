@@ -10,6 +10,7 @@ import {
   isValidUserAppRoleInsertRow,
   resolveSectionAppPairsForInsert,
 } from "@/lib/resolve-section-app-ids";
+import { ensureAuthUserForAdminRow } from "@/lib/ensure-auth-user-for-admin";
 
 type RoleRow = {
   id: string;
@@ -173,31 +174,24 @@ export async function POST(req: NextRequest) {
 
   const admin = requireAdminClient();
 
-  const { data: list } = await admin.auth.admin.listUsers({ perPage: 1000 });
-  let authUserRow = list?.users?.find((u) => (u.email ?? "").toLowerCase() === emailRaw) ?? null;
-
-  if (!authUserRow) {
-    if (password.length < 6) {
-      return NextResponse.json(
-        { error: "Password must be at least 6 characters" },
-        { status: 400 }
-      );
-    }
-    const { data: created, error: createErr } = await admin.auth.admin.createUser({
-      email: emailRaw,
-      password,
-      email_confirm: true,
-    });
-    if (createErr || !created.user) {
-      return NextResponse.json(
-        { error: createErr?.message ?? "Could not create user" },
-        { status: 500 }
-      );
-    }
-    authUserRow = created.user;
+  let authResult;
+  try {
+    authResult = await ensureAuthUserForAdminRow(admin, emailRaw, password);
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Auth lookup failed" },
+      { status: 500 }
+    );
+  }
+  if (!authResult.ok) {
+    return NextResponse.json({ error: authResult.message }, { status: 400 });
   }
 
-  const uid = authUserRow.id;
+  const uid = authResult.user.id;
+
+  if (process.env.DEBUG_USER_APP_ROLES === "1") {
+    console.log("[api/admin/users POST] auth outcome:", authResult.outcome);
+  }
 
   let existingSectionSet = new Set<string>();
   if (sectionIds.length > 0) {
@@ -287,5 +281,6 @@ export async function POST(req: NextRequest) {
     user_id: uid,
     added_sections: toInsertSections.length,
     added_apps: toInsertApps.length,
+    auth_outcome: authResult.outcome,
   });
 }

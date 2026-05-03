@@ -130,12 +130,19 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await res.json().catch(() => ({}));
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        auth_outcome?: string;
+      };
       if (!res.ok) {
         setError(data?.error ?? "Could not create administrator");
         return;
       }
-      showToast("Administrator created or updated");
+      if (data.auth_outcome === "invited") {
+        showToast("Invite sent — user must open the email link to set a password, then can sign in to OnSite-D.");
+      } else {
+        showToast("Administrator created or updated");
+      }
       setCreateOpen(false);
       await load();
     } catch {
@@ -373,7 +380,7 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
             onChange={(e) => setEmail(e.target.value)}
           />
           <label className="mb-1 block text-[11px] font-medium uppercase" style={{ color: "#71717a" }}>
-            Password (required only for new users, min. 6 characters)
+            Password (min 6) — for new users: set to create login for OnSite-D, or leave empty to email an invite
           </label>
           <input
             className="mb-3 w-full rounded border px-3 py-2 text-sm"

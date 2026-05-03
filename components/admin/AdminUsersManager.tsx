@@ -232,7 +232,11 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
   const formatDate = (iso: string | null) => {
     if (!iso) return "—";
     try {
-      return new Date(iso).toLocaleString("en-AU", { dateStyle: "short", timeStyle: "short" });
+      return new Date(iso).toLocaleString("en-AU", {
+        dateStyle: "short",
+        timeStyle: "short",
+        timeZone: "Australia/Perth",
+      });
     } catch {
       return iso;
     }

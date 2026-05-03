@@ -26,22 +26,23 @@ async function isSuperAdminForMiddleware(
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
-  const isAdminPage = pathname.startsWith("/admin");
-  const isAdminApi = pathname.startsWith("/api/admin");
-
-  if (!isAdminPage && !isAdminApi) {
-    return NextResponse.next();
-  }
+  const isMainDashboard = pathname === "/";
+  const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/");
+  const isAdminApiRoute =
+    pathname === "/api/admin" || pathname.startsWith("/api/admin/");
 
   let response = NextResponse.next({ request });
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
   if (!supabaseUrl || !supabaseAnonKey) {
-    if (isAdminPage) {
+    if (isMainDashboard || isAdminRoute) {
       return NextResponse.redirect(new URL("/login?error=config", request.url));
     }
-    return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
+    if (isAdminApiRoute) {
+      return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
+    }
+    return NextResponse.next();
   }
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
@@ -53,7 +54,7 @@ export async function middleware(request: NextRequest) {
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
         response = NextResponse.next({ request });
         cookiesToSet.forEach(({ name, value, options }) =>
-          response.cookies.set(name, value, options)
+          response.cookies.set(name, value, options),
         );
       },
     },
@@ -64,30 +65,35 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   /**
-   * Admin API routes must run through this middleware so Supabase SSR can refresh
-   * session cookies before Route Handlers call getUser(). Without this, PATCH/POST
-   * to /api/admin/* often returned 401 Unauthorized while /admin pages still loaded.
+   * Admin API: only run through middleware for Supabase SSR cookie refresh.
+   * No redirect, no super_admin check here — route handlers enforce auth.
    */
-  if (isAdminApi) {
+  if (isAdminApiRoute) {
     return response;
   }
 
   if (!user) {
     const login = new URL("/login", request.url);
-    login.searchParams.set("redirect", request.nextUrl.pathname);
+    login.searchParams.set("redirect", pathname);
     return NextResponse.redirect(login);
   }
 
-  const allowed = await isSuperAdminForMiddleware(user.id, user.email ?? null);
-  if (!allowed) {
-    const login = new URL("/login", request.url);
-    login.searchParams.set("error", "forbidden");
-    return NextResponse.redirect(login);
+  if (isMainDashboard) {
+    return response;
+  }
+
+  if (isAdminRoute) {
+    const allowed = await isSuperAdminForMiddleware(user.id, user.email ?? null);
+    if (!allowed) {
+      const login = new URL("/login", request.url);
+      login.searchParams.set("error", "forbidden");
+      return NextResponse.redirect(login);
+    }
   }
 
   return response;
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/admin/:path*"],
+  matcher: ["/", "/admin", "/admin/:path*", "/api/admin/:path*"],
 };

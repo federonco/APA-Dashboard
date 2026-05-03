@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { checkSuperAdminServiceRole } from "@/lib/super-admin-check";
 
 export type CrewInfo = {
   id: string;
@@ -43,16 +44,9 @@ export async function getAdminCrew(): Promise<CrewInfo | null> {
   return crew ? { id: crew.id, name: crew.name, zone: crew.zone } : null;
 }
 
-/** Check if user is super admin (access to /admin). Uses user_app_roles with role super_admin. */
+/** Check if user is super admin (access to /admin). See lib/super-admin-check.ts. */
 export async function isSuperAdmin(userId: string, email: string | null): Promise<boolean> {
   const admin = createAdminClient();
   if (!admin) return false;
-  const { data } = await admin
-    .from("user_app_roles")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("role", "super_admin")
-    .limit(1)
-    .maybeSingle();
-  return !!data;
+  return checkSuperAdminServiceRole(admin, userId, email);
 }

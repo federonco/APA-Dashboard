@@ -38,8 +38,8 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
     setError(null);
     try {
       const [uRes, sRes] = await Promise.all([
-        fetch("/api/admin/users"),
-        fetch("/api/admin/sections"),
+        fetch("/api/admin/users", { credentials: "include" }),
+        fetch("/api/admin/sections", { credentials: "include" }),
       ]);
       if (!uRes.ok) {
         const d = await uRes.json().catch(() => ({}));
@@ -92,6 +92,7 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
     try {
       const res = await fetch("/api/admin/users", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email,
@@ -127,6 +128,7 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
       }
       const res = await fetch(`/api/admin/users/${editUser.user_id}`, {
         method: "PATCH",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
@@ -153,6 +155,7 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
     try {
       const res = await fetch(`/api/admin/users/${deleteUser.user_id}`, {
         method: "DELETE",
+        credentials: "include",
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {

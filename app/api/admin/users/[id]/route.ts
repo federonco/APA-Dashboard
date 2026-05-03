@@ -1,26 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { requireAdminClient } from "@/lib/supabase/admin";
-import { isSuperAdmin } from "@/lib/auth";
-
-async function requireSuperAdmin() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user || !(await isSuperAdmin(user.id, user.email ?? null))) {
-    return null;
-  }
-  return user;
-}
+import { requireSuperAdminJson } from "@/lib/admin-api-auth";
 
 export async function PATCH(
   req: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
-  const authUser = await requireSuperAdmin();
-  if (!authUser) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireSuperAdminJson();
+  if (!auth.ok) {
+    return auth.response;
   }
 
   const { id: userId } = await ctx.params;
@@ -95,9 +83,9 @@ export async function DELETE(
   _req: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
-  const authUser = await requireSuperAdmin();
-  if (!authUser) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireSuperAdminJson();
+  if (!auth.ok) {
+    return auth.response;
   }
 
   const { id: userId } = await ctx.params;
@@ -105,7 +93,7 @@ export async function DELETE(
     return NextResponse.json({ error: "Missing id" }, { status: 400 });
   }
 
-  if (userId === authUser.id) {
+  if (userId === auth.user.id) {
     return NextResponse.json({ error: "You cannot remove your own access" }, { status: 403 });
   }
 

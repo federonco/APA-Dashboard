@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
+import { checkSuperAdminServiceRole } from "@/lib/super-admin-check";
 
 function getServiceRoleKey(): string {
   return (
@@ -10,25 +11,25 @@ function getServiceRoleKey(): string {
   );
 }
 
-async function isSuperAdminUserId(userId: string): Promise<boolean> {
+async function isSuperAdminForMiddleware(
+  userId: string,
+  email: string | null,
+): Promise<boolean> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const key = getServiceRoleKey();
   if (!url || !key) return false;
   const admin = createServiceClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
-  const { data } = await admin
-    .from("user_app_roles")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("role", "super_admin")
-    .limit(1)
-    .maybeSingle();
-  return !!data;
+  return checkSuperAdminServiceRole(admin, userId, email);
 }
 
 export async function middleware(request: NextRequest) {
-  if (!request.nextUrl.pathname.startsWith("/admin")) {
+  const pathname = request.nextUrl.pathname;
+  const isAdminPage = pathname.startsWith("/admin");
+  const isAdminApi = pathname.startsWith("/api/admin");
+
+  if (!isAdminPage && !isAdminApi) {
     return NextResponse.next();
   }
 
@@ -37,7 +38,10 @@ export async function middleware(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
   if (!supabaseUrl || !supabaseAnonKey) {
-    return NextResponse.redirect(new URL("/login?error=config", request.url));
+    if (isAdminPage) {
+      return NextResponse.redirect(new URL("/login?error=config", request.url));
+    }
+    return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
   }
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
@@ -59,13 +63,22 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  /**
+   * Admin API routes must run through this middleware so Supabase SSR can refresh
+   * session cookies before Route Handlers call getUser(). Without this, PATCH/POST
+   * to /api/admin/* often returned 401 Unauthorized while /admin pages still loaded.
+   */
+  if (isAdminApi) {
+    return response;
+  }
+
   if (!user) {
     const login = new URL("/login", request.url);
     login.searchParams.set("redirect", request.nextUrl.pathname);
     return NextResponse.redirect(login);
   }
 
-  const allowed = await isSuperAdminUserId(user.id);
+  const allowed = await isSuperAdminForMiddleware(user.id, user.email ?? null);
   if (!allowed) {
     const login = new URL("/login", request.url);
     login.searchParams.set("error", "forbidden");
@@ -76,5 +89,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/admin/:path*", "/api/admin/:path*"],
 };

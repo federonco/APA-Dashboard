@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { requireAdminClient } from "@/lib/supabase/admin";
+import { checkSuperAdminServiceRole } from "@/lib/super-admin-check";
 
 export async function POST(request: Request) {
   let body: { email?: string; password?: string };
@@ -62,15 +63,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const { data: superRow } = await admin
-    .from("user_app_roles")
-    .select("id")
-    .eq("user_id", data.user.id)
-    .eq("role", "super_admin")
-    .limit(1)
-    .maybeSingle();
+  const allowed = await checkSuperAdminServiceRole(admin, data.user.id, data.user.email ?? null);
 
-  if (!superRow) {
+  if (!allowed) {
     await supabase.auth.signOut();
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }

@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdminClient } from "@/lib/supabase/admin";
 import { isSuperAdmin } from "@/lib/auth";
+import { getSectionAssignmentRolesForQuery } from "@/lib/user-app-roles";
 import { tokens } from "@/lib/designTokens";
 
 interface Props {
@@ -44,7 +45,7 @@ export default async function AdminSectionDetailPage({ params }: Props) {
     .from("user_app_roles")
     .select("user_id, user_email, role")
     .eq("section_id", id)
-    .eq("role", "section_admin");
+    .in("role", [...getSectionAssignmentRolesForQuery()]);
 
   const crewName = (section as { crews?: { name?: string | null } }).crews?.name ?? "—";
 

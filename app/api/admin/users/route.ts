@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminClient } from "@/lib/supabase/admin";
 import { requireSuperAdminJson } from "@/lib/admin-api-auth";
+import {
+  getSectionAssignmentInsertRole,
+  getSectionAssignmentRolesForQuery,
+} from "@/lib/user-app-roles";
 
 type RoleRow = {
   id: string;
@@ -103,11 +107,20 @@ export async function POST(req: NextRequest) {
     return auth.response;
   }
 
-  let body: { email?: string; password?: string; section_ids?: string[] };
+  let body: { email?: string; password?: string; section_ids?: string[]; role?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  if (process.env.DEBUG_USER_APP_ROLES === "1") {
+    console.log("[api/admin/users POST] REQUEST BODY:", {
+      email: body.email,
+      section_ids: body.section_ids,
+      role_from_client: body.role ?? "(omitted — not used)",
+      role_used_for_insert: getSectionAssignmentInsertRole(),
+    });
   }
 
   const emailRaw = String(body.email ?? "").trim().toLowerCase();
@@ -153,7 +166,7 @@ export async function POST(req: NextRequest) {
     .from("user_app_roles")
     .select("section_id")
     .eq("user_id", uid)
-    .eq("role", "section_admin")
+    .in("role", [...getSectionAssignmentRolesForQuery()])
     .in("section_id", sectionIds);
 
   const existingSet = new Set(
@@ -165,10 +178,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "This user already has those sections" }, { status: 409 });
   }
 
+  const insertRole = getSectionAssignmentInsertRole();
   const inserts = toInsert.map((section_id) => ({
     user_id: uid,
     user_email: emailRaw,
-    role: "section_admin" as const,
+    role: insertRole,
     section_id,
   }));
 

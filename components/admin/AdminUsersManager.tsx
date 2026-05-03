@@ -173,10 +173,12 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
   };
 
   const formatRole = (g: GroupedAdmin) => {
+    const hasSections = g.sections.length > 0;
     if (g.roles.includes("section_admin") && g.roles.includes("admin")) {
       return "section_admin + admin";
     }
     if (g.roles.includes("section_admin")) return "section_admin";
+    if (hasSections && g.roles.includes("admin")) return "section admin";
     return g.roles[0] ?? "—";
   };
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdminClient } from "@/lib/supabase/admin";
 import { isSuperAdmin } from "@/lib/auth";
+import { getSectionAssignmentRolesForQuery } from "@/lib/user-app-roles";
 
 async function requireSuperAdminUser() {
   const supabase = await createClient();
@@ -46,7 +47,7 @@ export async function GET(
     .from("user_app_roles")
     .select("user_id, user_email, role")
     .eq("section_id", id)
-    .eq("role", "section_admin");
+    .in("role", [...getSectionAssignmentRolesForQuery()]);
 
   return NextResponse.json({
     section: {

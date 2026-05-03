@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdminClient } from "@/lib/supabase/admin";
 import { isSuperAdmin } from "@/lib/auth";
+import { getSectionAssignmentRolesForQuery } from "@/lib/user-app-roles";
 
 async function requireSuperAdminUser() {
   const supabase = await createClient();
@@ -75,7 +76,7 @@ export async function GET(req: NextRequest) {
   const { data: roleRows } = await admin
     .from("user_app_roles")
     .select("section_id")
-    .eq("role", "section_admin")
+    .in("role", [...getSectionAssignmentRolesForQuery()])
     .not("section_id", "is", null);
 
   const counts = new Map<string, number>();

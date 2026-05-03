@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminClient } from "@/lib/supabase/admin";
 import { requireSuperAdminJson } from "@/lib/admin-api-auth";
+import {
+  getSectionAssignmentInsertRole,
+  getSectionAssignmentRolesForQuery,
+} from "@/lib/user-app-roles";
 
 export async function PATCH(
   req: NextRequest,
@@ -16,11 +20,20 @@ export async function PATCH(
     return NextResponse.json({ error: "Missing id" }, { status: 400 });
   }
 
-  let body: { section_ids?: string[]; password?: string };
+  let body: { section_ids?: string[]; password?: string; role?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  if (process.env.DEBUG_USER_APP_ROLES === "1") {
+    console.log("[api/admin/users PATCH] REQUEST BODY:", {
+      section_ids: body.section_ids,
+      has_password: body.password !== undefined,
+      role_from_client: body.role ?? "(omitted — not used)",
+      role_used_for_insert: getSectionAssignmentInsertRole(),
+    });
   }
 
   const admin = requireAdminClient();
@@ -42,7 +55,8 @@ export async function PATCH(
       .from("user_app_roles")
       .delete()
       .eq("user_id", userId)
-      .eq("role", "section_admin");
+      .in("role", [...getSectionAssignmentRolesForQuery()])
+      .not("section_id", "is", null);
     if (delErr) {
       return NextResponse.json({ error: delErr.message }, { status: 500 });
     }
@@ -62,10 +76,11 @@ export async function PATCH(
         email = (u.user?.email ?? "").trim();
       }
 
+      const insertRole = getSectionAssignmentInsertRole();
       const inserts = sectionIds.map((section_id) => ({
         user_id: userId,
         user_email: email || null,
-        role: "section_admin" as const,
+        role: insertRole,
         section_id,
       }));
 

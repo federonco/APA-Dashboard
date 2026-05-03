@@ -11,9 +11,15 @@ type SectionOption = {
   crew_name: string | null;
 };
 
+type AppOption = {
+  id: string;
+  name: string;
+};
+
 export function AdminUsersManager({ currentUserId }: { currentUserId: string }) {
   const [rows, setRows] = useState<GroupedAdmin[]>([]);
   const [sections, setSections] = useState<SectionOption[]>([]);
+  const [apps, setApps] = useState<AppOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -25,6 +31,7 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [selectedSections, setSelectedSections] = useState<Set<string>>(new Set());
+  const [selectedApps, setSelectedApps] = useState<Set<string>>(new Set());
 
   const [saving, setSaving] = useState(false);
 
@@ -37,9 +44,10 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
     setLoading(true);
     setError(null);
     try {
-      const [uRes, sRes] = await Promise.all([
+      const [uRes, sRes, aRes] = await Promise.all([
         fetch("/api/admin/users"),
         fetch("/api/admin/sections"),
+        fetch("/api/admin/apps"),
       ]);
       if (!uRes.ok) {
         const d = await uRes.json().catch(() => ({}));
@@ -49,10 +57,16 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
         const d = await sRes.json().catch(() => ({}));
         throw new Error(d?.error ?? "Failed to load sections");
       }
+      if (!aRes.ok) {
+        const d = await aRes.json().catch(() => ({}));
+        throw new Error(d?.error ?? "Failed to load apps");
+      }
       const uData = (await uRes.json()) as GroupedAdmin[];
       const sData = (await sRes.json()) as SectionOption[];
+      const aData = (await aRes.json()) as AppOption[];
       setRows(uData);
       setSections(sData);
+      setApps(aData);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
     } finally {
@@ -73,10 +87,20 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
     });
   };
 
+  const toggleApp = (id: string) => {
+    setSelectedApps((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  };
+
   const openCreate = () => {
     setEmail("");
     setPassword("");
     setSelectedSections(new Set());
+    setSelectedApps(new Set());
     setCreateOpen(true);
   };
 
@@ -84,6 +108,7 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
     setEditUser(g);
     setPassword("");
     setSelectedSections(new Set(g.sections.map((s) => s.id).filter(Boolean) as string[]));
+    setSelectedApps(new Set(g.app_ids));
   };
 
   const handleCreate = async () => {
@@ -97,6 +122,7 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
           email,
           password,
           section_ids: [...selectedSections],
+          app_ids: [...selectedApps],
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -119,8 +145,9 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
     setSaving(true);
     setError(null);
     try {
-      const payload: { section_ids: string[]; password?: string } = {
+      const payload: { section_ids: string[]; app_ids: string[]; password?: string } = {
         section_ids: [...selectedSections],
+        app_ids: [...selectedApps],
       };
       if (password.trim().length >= 6) {
         payload.password = password.trim();
@@ -187,6 +214,7 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
   };
 
   const sectionsById = useMemo(() => new Map(sections.map((s) => [s.id, s])), [sections]);
+  const appsById = useMemo(() => new Map(apps.map((a) => [a.id, a])), [apps]);
 
   return (
     <div className="space-y-6">
@@ -236,7 +264,7 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm" style={{ color: "#3f3f46" }}>
+            <table className="w-full min-w-[800px] text-sm" style={{ color: "#3f3f46" }}>
               <thead>
                 <tr style={{ background: "#F7F7F7", borderBottom: `1px solid ${tokens.theme.border}` }}>
                   <th className="px-4 py-3 text-left text-[11px] font-medium uppercase" style={{ color: "#71717a" }}>
@@ -244,6 +272,9 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
                   </th>
                   <th className="px-4 py-3 text-left text-[11px] font-medium uppercase" style={{ color: "#71717a" }}>
                     Role
+                  </th>
+                  <th className="px-4 py-3 text-left text-[11px] font-medium uppercase" style={{ color: "#71717a" }}>
+                    Apps
                   </th>
                   <th className="px-4 py-3 text-left text-[11px] font-medium uppercase" style={{ color: "#71717a" }}>
                     Sections
@@ -261,6 +292,11 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
                   <tr key={g.user_id} className="border-b" style={{ borderColor: "#EEECEF" }}>
                     <td className="px-4 py-3 text-xs font-medium">{g.user_email}</td>
                     <td className="px-4 py-3 text-xs">{formatRole(g)}</td>
+                    <td className="px-4 py-3 text-xs" style={{ color: "#71717a" }}>
+                      {g.app_ids.length > 0
+                        ? g.app_ids.map((id) => appsById.get(id)?.name ?? id).join(", ")
+                        : "—"}
+                    </td>
                     <td className="px-4 py-3 text-xs" style={{ color: "#71717a" }}>
                       {g.sections.length > 0
                         ? g.sections.map((s) => s.name ?? s.id).join(", ")
@@ -304,7 +340,7 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
       {createOpen && (
         <Modal title="New administrator" onClose={() => !saving && setCreateOpen(false)}>
           <p className="mb-3 text-xs" style={{ color: "#71717a" }}>
-            If the email already exists, only sections will be assigned (no new auth user).
+            If the email already exists, only sections/apps will be assigned (no new auth user).
           </p>
           <label className="mb-1 block text-[11px] font-medium uppercase" style={{ color: "#71717a" }}>
             Email
@@ -326,6 +362,21 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
+          <p className="mb-2 text-[11px] font-medium uppercase" style={{ color: "#71717a" }}>
+            Apps
+          </p>
+          <div className="mb-4 space-y-2 rounded border p-2" style={{ borderColor: "#E2E0E6" }}>
+            {apps.map((a) => (
+              <label key={a.id} className="flex cursor-pointer items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  checked={selectedApps.has(a.id)}
+                  onChange={() => toggleApp(a.id)}
+                />
+                <span>{a.name}</span>
+              </label>
+            ))}
+          </div>
           <p className="mb-2 text-[11px] font-medium uppercase" style={{ color: "#71717a" }}>
             Sections
           </p>
@@ -361,7 +412,7 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
               type="button"
               className="rounded-md px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
               style={{ background: "#B96A2D" }}
-              disabled={saving || !email.trim() || selectedSections.size === 0}
+              disabled={saving || !email.trim() || (selectedSections.size === 0 && selectedApps.size === 0)}
               onClick={() => void handleCreate()}
             >
               {saving ? "Saving…" : "Create"}
@@ -386,6 +437,21 @@ export function AdminUsersManager({ currentUserId }: { currentUserId: string }) 
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="new-password"
           />
+          <p className="mb-2 text-[11px] font-medium uppercase" style={{ color: "#71717a" }}>
+            Apps
+          </p>
+          <div className="mb-4 space-y-2 rounded border p-2" style={{ borderColor: "#E2E0E6" }}>
+            {apps.map((a) => (
+              <label key={a.id} className="flex cursor-pointer items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  checked={selectedApps.has(a.id)}
+                  onChange={() => toggleApp(a.id)}
+                />
+                <span>{a.name}</span>
+              </label>
+            ))}
+          </div>
           <p className="mb-2 text-[11px] font-medium uppercase" style={{ color: "#71717a" }}>
             Assigned sections
           </p>

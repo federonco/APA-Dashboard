@@ -9,6 +9,7 @@ type RoleRow = {
   user_email: string | null;
   role: string | null;
   section_id: string | null;
+  app_id: string | null;
   crew_id: string | null;
   created_at: string | null;
   sections: { name: string | null } | { name: string | null }[] | null;
@@ -20,6 +21,7 @@ export type GroupedAdmin = {
   user_email: string;
   roles: string[];
   sections: { id: string | null; name: string | null }[];
+  app_ids: string[];
   crew_label: string | null;
   created_at: string | null;
   row_ids: string[];
@@ -46,7 +48,7 @@ export async function GET() {
   const { data, error } = await admin
     .from("user_app_roles")
     .select(
-      "id, user_id, user_email, role, section_id, crew_id, created_at, sections(name), crews(name)"
+      "id, user_id, user_email, role, section_id, app_id, crew_id, created_at, sections(name), crews(name)"
     )
     .neq("role", "super_admin")
     .order("user_email", { ascending: true })
@@ -79,6 +81,7 @@ export async function GET() {
         user_email: email,
         roles: [],
         sections: [],
+        app_ids: [],
         crew_label: null,
         created_at: r.created_at,
         row_ids: [],
@@ -94,6 +97,9 @@ export async function GET() {
         id: r.section_id,
         name: embedName(r.sections),
       });
+    }
+    if (r.role === "admin" && r.app_id && !g.app_ids.includes(r.app_id)) {
+      g.app_ids.push(r.app_id);
     }
     const crewNm = embedName(r.crews);
     if (r.crew_id && crewNm) {
@@ -115,7 +121,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { email?: string; password?: string; section_ids?: string[] };
+  let body: { email?: string; password?: string; section_ids?: string[]; app_ids?: string[] };
   try {
     body = await req.json();
   } catch {
@@ -125,12 +131,13 @@ export async function POST(req: NextRequest) {
   const emailRaw = String(body.email ?? "").trim().toLowerCase();
   const password = String(body.password ?? "");
   const sectionIds = Array.isArray(body.section_ids) ? body.section_ids : [];
+  const appIds = Array.isArray(body.app_ids) ? body.app_ids : [];
 
   if (!emailRaw) {
     return NextResponse.json({ error: "Email is required" }, { status: 400 });
   }
-  if (sectionIds.length === 0) {
-    return NextResponse.json({ error: "Select at least one section" }, { status: 400 });
+  if (sectionIds.length === 0 && appIds.length === 0) {
+    return NextResponse.json({ error: "Select at least one section or app" }, { status: 400 });
   }
 
   const admin = requireAdminClient();
@@ -161,33 +168,59 @@ export async function POST(req: NextRequest) {
 
   const uid = authUserRow.id;
 
-  const { data: existingSectionRoles } = await admin
-    .from("user_app_roles")
-    .select("section_id")
-    .eq("user_id", uid)
-    .eq("role", "section_admin")
-    .in("section_id", sectionIds);
+  if (sectionIds.length > 0) {
+    const { data: existingSectionRoles } = await admin
+      .from("user_app_roles")
+      .select("section_id")
+      .eq("user_id", uid)
+      .eq("role", "section_admin")
+      .in("section_id", sectionIds);
 
-  const existingSet = new Set(
-    (existingSectionRoles ?? []).map((r) => r.section_id).filter(Boolean) as string[]
-  );
+    const existingSet = new Set(
+      (existingSectionRoles ?? []).map((r) => r.section_id).filter(Boolean) as string[]
+    );
 
-  const toInsert = sectionIds.filter((sid) => sid && !existingSet.has(sid));
-  if (toInsert.length === 0) {
-    return NextResponse.json({ error: "This user already has those sections" }, { status: 409 });
+    const toInsert = sectionIds.filter((sid) => sid && !existingSet.has(sid));
+    if (toInsert.length > 0) {
+      const inserts = toInsert.map((section_id) => ({
+        user_id: uid,
+        user_email: emailRaw,
+        role: "section_admin" as const,
+        section_id,
+      }));
+      const { error: insErr } = await admin.from("user_app_roles").insert(inserts);
+      if (insErr) {
+        return NextResponse.json({ error: insErr.message }, { status: 500 });
+      }
+    }
   }
 
-  const inserts = toInsert.map((section_id) => ({
-    user_id: uid,
-    user_email: emailRaw,
-    role: "section_admin" as const,
-    section_id,
-  }));
+  if (appIds.length > 0) {
+    const { data: existingAppRoles } = await admin
+      .from("user_app_roles")
+      .select("app_id")
+      .eq("user_id", uid)
+      .eq("role", "admin")
+      .in("app_id", appIds);
 
-  const { error: insErr } = await admin.from("user_app_roles").insert(inserts);
-  if (insErr) {
-    return NextResponse.json({ error: insErr.message }, { status: 500 });
+    const existingAppSet = new Set(
+      (existingAppRoles ?? []).map((r) => r.app_id).filter(Boolean) as string[]
+    );
+    const appsToInsert = appIds.filter((id) => id && !existingAppSet.has(id));
+
+    if (appsToInsert.length > 0) {
+      const appInserts = appsToInsert.map((app_id) => ({
+        user_id: uid,
+        user_email: emailRaw,
+        role: "admin" as const,
+        app_id,
+      }));
+      const { error: appInsErr } = await admin.from("user_app_roles").insert(appInserts);
+      if (appInsErr) {
+        return NextResponse.json({ error: appInsErr.message }, { status: 500 });
+      }
+    }
   }
 
-  return NextResponse.json({ ok: true, user_id: uid, added: toInsert.length });
+  return NextResponse.json({ ok: true, user_id: uid });
 }

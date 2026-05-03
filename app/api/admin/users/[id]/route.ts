@@ -28,7 +28,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Missing id" }, { status: 400 });
   }
 
-  let body: { section_ids?: string[]; password?: string };
+  let body: { section_ids?: string[]; password?: string; app_ids?: string[] };
   try {
     body = await req.json();
   } catch {
@@ -82,6 +82,45 @@ export async function PATCH(
       }));
 
       const { error: insErr } = await admin.from("user_app_roles").insert(inserts);
+      if (insErr) {
+        return NextResponse.json({ error: insErr.message }, { status: 500 });
+      }
+    }
+  }
+
+  if (body.app_ids !== undefined) {
+    const appIds = Array.isArray(body.app_ids) ? body.app_ids : [];
+
+    const { error: delErr } = await admin
+      .from("user_app_roles")
+      .delete()
+      .eq("user_id", userId)
+      .eq("role", "admin");
+    if (delErr) {
+      return NextResponse.json({ error: delErr.message }, { status: 500 });
+    }
+
+    if (appIds.length > 0) {
+      let email = "";
+      const { data: profile } = await admin
+        .from("user_app_roles")
+        .select("user_email")
+        .eq("user_id", userId)
+        .limit(1)
+        .maybeSingle();
+      email = (profile as { user_email?: string } | null)?.user_email?.trim() ?? "";
+      if (!email) {
+        const { data: u } = await admin.auth.admin.getUserById(userId);
+        email = (u.user?.email ?? "").trim();
+      }
+
+      const appInserts = appIds.map((app_id) => ({
+        user_id: userId,
+        user_email: email || null,
+        role: "admin" as const,
+        app_id,
+      }));
+      const { error: insErr } = await admin.from("user_app_roles").insert(appInserts);
       if (insErr) {
         return NextResponse.json({ error: insErr.message }, { status: 500 });
       }

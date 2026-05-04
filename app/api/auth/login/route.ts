@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { requireAdminClient } from "@/lib/supabase/admin";
+import { isDashboardUser } from "@/lib/dashboard-access-check";
 import { checkSuperAdminServiceRole } from "@/lib/super-admin-check";
 
 export async function POST(request: Request) {
@@ -63,12 +64,13 @@ export async function POST(request: Request) {
     );
   }
 
-  const allowed = await checkSuperAdminServiceRole(admin, data.user.id, data.user.email ?? null);
+  const allowed = await isDashboardUser(admin, data.user.id, data.user.email ?? null);
 
   if (!allowed) {
     await supabase.auth.signOut();
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
-  return NextResponse.json({ ok: true });
+  const isSuperAdmin = await checkSuperAdminServiceRole(admin, data.user.id, data.user.email ?? null);
+  return NextResponse.json({ ok: true, isSuperAdmin });
 }

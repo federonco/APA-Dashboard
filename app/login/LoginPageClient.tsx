@@ -17,9 +17,11 @@ function LoginForm() {
   const urlError =
     errorParam === "forbidden"
       ? "Access denied (super admin only)"
-      : errorParam === "config"
-        ? "Server configuration error"
-        : "";
+      : errorParam === "no_dashboard_access"
+        ? "No access to this dashboard for this account"
+        : errorParam === "config"
+          ? "Server configuration error"
+          : "";
 
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
@@ -40,15 +42,15 @@ function LoginForm() {
         setLoading(false);
         return;
       }
+      const defaultPath = data?.isSuperAdmin ? "/admin" : "/";
       const target =
         redirectParam && redirectParam.startsWith("/") && !redirectParam.startsWith("//")
           ? redirectParam
-          : "/admin";
+          : defaultPath;
       router.push(target);
       router.refresh();
     } catch {
       setError("Network error");
-    } finally {
       setLoading(false);
     }
   }
@@ -68,9 +70,9 @@ function LoginForm() {
           width: "100%",
         }}
       >
-        <h1 style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}>Login admin</h1>
+        <h1 style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}>Sign in</h1>
         <p style={{ fontSize: 14, color: "#71717a", marginBottom: 24 }}>
-          Super admin only. Email and password.
+          Super admins and dashboard administrators. Email and password.
         </p>
         <form onSubmit={handleSignIn} className="flex flex-col gap-4">
           <input
@@ -79,8 +81,9 @@ function LoginForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            disabled={loading}
             autoComplete="email"
-            className="selection:bg-[#D1D5DB] selection:text-[#111827]"
+            className="selection:bg-[#D1D5DB] selection:text-[#111827] disabled:cursor-not-allowed disabled:opacity-60"
             style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid #E8E6EB", fontSize: 14 }}
           />
           <input
@@ -89,8 +92,9 @@ function LoginForm() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            disabled={loading}
             autoComplete="current-password"
-            className="selection:bg-[#D1D5DB] selection:text-[#111827]"
+            className="selection:bg-[#D1D5DB] selection:text-[#111827] disabled:cursor-not-allowed disabled:opacity-60"
             style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid #E8E6EB", fontSize: 14 }}
           />
           {(error || urlError) && (
@@ -101,8 +105,21 @@ function LoginForm() {
             disabled={loading}
             className="w-full cursor-pointer rounded-lg border-none bg-[#D1D5DB] px-4 py-2 text-[0.875rem] font-medium text-[#111827] transition-[color,background-color] duration-150 hover:bg-[#E5E7EB] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? "Signing in…" : "Sign in"}
+            {loading ? "Signing in..." : "Sign in"}
           </button>
+          {loading && (
+            <div
+              className="flex items-center justify-center gap-2"
+              style={{ fontSize: 13, color: "#71717a" }}
+              aria-live="polite"
+            >
+              <span
+                className="inline-block h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-solid border-[#d4d4d8] border-t-[#52525b]"
+                aria-hidden
+              />
+              <span>Checking credentials...</span>
+            </div>
+          )}
         </form>
         <Link
           href="/"

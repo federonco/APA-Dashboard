@@ -1204,6 +1204,108 @@ export async function getActiveVehicleCount(
   }
 }
 
+/** Pipe front (chainage m) after installs through `day` (inclusive), or natural origin if none. */
+function pipeFrontChainageThroughDay(
+  startCh: number,
+  endCh: number,
+  directionBackwards: boolean,
+  pipes: { date_installed: string; chainage: number }[],
+  day: string,
+): number {
+  const subset = pipes.filter((p) => p.date_installed && p.date_installed <= day);
+  const chs = subset.map((p) => p.chainage).filter((n) => Number.isFinite(n));
+  if (chs.length === 0) {
+    return directionBackwards ? endCh : startCh;
+  }
+  return directionBackwards ? Math.min(...chs) : Math.max(...chs);
+}
+
+/** Same as {@link pipeFrontChainageThroughDay} but strictly before `day`. */
+function pipeFrontChainageBeforeDay(
+  startCh: number,
+  endCh: number,
+  directionBackwards: boolean,
+  pipes: { date_installed: string; chainage: number }[],
+  day: string,
+): number {
+  const subset = pipes.filter((p) => p.date_installed && p.date_installed < day);
+  const chs = subset.map((p) => p.chainage).filter((n) => Number.isFinite(n));
+  if (chs.length === 0) {
+    return directionBackwards ? endCh : startCh;
+  }
+  return directionBackwards ? Math.min(...chs) : Math.max(...chs);
+}
+
+/** Metres advanced on `day` = |CH front end of day − CH front start of day| along drive direction. */
+function dailyPipeMetresFromChainageFront(
+  startCh: number,
+  endCh: number,
+  directionBackwards: boolean,
+  pipes: { date_installed: string; chainage: number }[],
+  day: string,
+): number {
+  const chInitial = pipeFrontChainageBeforeDay(startCh, endCh, directionBackwards, pipes, day);
+  const chFinal = pipeFrontChainageThroughDay(startCh, endCh, directionBackwards, pipes, day);
+  const delta = directionBackwards ? chInitial - chFinal : chFinal - chInitial;
+  return Math.max(0, Math.round(delta * 10) / 10);
+}
+
+type PipeChRow = { date_installed: string; chainage: number; section_id: string };
+
+async function pipeMetresByWorkingDayFromChainage(
+  supabase: NonNullable<ReturnType<typeof createAdminClient>>,
+  sectionIds: string[],
+  workingDays: string[],
+): Promise<Record<string, number>> {
+  const pipeByDay: Record<string, number> = {};
+  if (sectionIds.length === 0 || workingDays.length === 0) {
+    return pipeByDay;
+  }
+  const lastDay = workingDays[workingDays.length - 1];
+  const [{ data: sectionRows, error: secErr }, { data: pipeRows, error: pipeErr }] =
+    await Promise.all([
+      supabase
+        .from("drainer_sections")
+        .select("id, start_ch, end_ch, direction")
+        .in("id", sectionIds),
+      supabase
+        .from("drainer_pipe_records")
+        .select("section_id, date_installed, chainage")
+        .in("section_id", sectionIds)
+        .not("chainage", "is", null)
+        .lte("date_installed", lastDay),
+    ]);
+  if (secErr) throw secErr;
+  if (pipeErr) throw pipeErr;
+
+  const pipesBySection = new Map<string, PipeChRow[]>();
+  for (const r of pipeRows ?? []) {
+    const sid = String((r as { section_id?: string | null }).section_id ?? "");
+    const di = (r as { date_installed?: string | null }).date_installed;
+    const ch = Number((r as { chainage?: unknown }).chainage);
+    if (!sid || !di || Number.isNaN(ch)) continue;
+    const row: PipeChRow = { section_id: sid, date_installed: di, chainage: ch };
+    const list = pipesBySection.get(sid) ?? [];
+    list.push(row);
+    pipesBySection.set(sid, list);
+  }
+
+  for (const d of workingDays) {
+    let sumDay = 0;
+    for (const sec of sectionRows ?? []) {
+      const id = String((sec as { id?: string }).id ?? "");
+      if (!id) continue;
+      const startCh = Number((sec as { start_ch?: unknown }).start_ch) || 0;
+      const endCh = Number((sec as { end_ch?: unknown }).end_ch) || 0;
+      const directionBackwards = (sec as { direction?: string }).direction === "backwards";
+      const pipes = pipesBySection.get(id) ?? [];
+      sumDay += dailyPipeMetresFromChainageFront(startCh, endCh, directionBackwards, pipes, d);
+    }
+    pipeByDay[d] = Math.round(sumDay * 10) / 10;
+  }
+  return pipeByDay;
+}
+
 // --- CURRENT MONTH DAILY PROGRESS ---
 export async function getCurrentMonthDailyProgress(
   crewId?: string | null,
@@ -1247,23 +1349,10 @@ export async function getCurrentMonthDailyProgress(
     const { start: startTs } = dayStartEndPerth(workingDays[0]);
     const { end: endTs } = dayStartEndPerth(workingDays[workingDays.length - 1]);
 
-    let pipeQuery = supabase
-      .from("drainer_pipe_records")
-      .select("date_installed")
-      .gte("date_installed", workingDays[0])
-      .lte("date_installed", workingDays[workingDays.length - 1]);
-    if (sectionIds.length > 0) pipeQuery = pipeQuery.in("section_id", sectionIds);
-
-    const { data: pipeRows, error: pipeErr } = await pipeQuery;
-    if (pipeErr) throw pipeErr;
-
-    const pipeByDay: Record<string, number> = {};
-    for (const r of pipeRows ?? []) {
-      const d = (r as { date_installed?: string }).date_installed;
-      if (d && workingDays.includes(d)) {
-        pipeByDay[d] = (pipeByDay[d] ?? 0) + 1;
-      }
-    }
+    const pipeByDay =
+      sectionIds.length > 0
+        ? await pipeMetresByWorkingDayFromChainage(supabase, sectionIds, workingDays)
+        : {};
 
     let pspQuery = supabase
       .from("psp_records")
@@ -1287,7 +1376,7 @@ export async function getCurrentMonthDailyProgress(
     let pipeCum = 0;
     let prevBackfillCum = 0;
     const result = workingDays.map((d) => {
-      const pipeM = Math.round(((pipeByDay[d] ?? 0) * PIPE_LENGTH_M) * 10) / 10;
+      const pipeM = Math.round((pipeByDay[d] ?? 0) * 10) / 10;
       pipeCum += pipeM;
       const mockBackfillCum = Math.max(0, Math.round((pipeCum - 25) * 10) / 10);
       const backfillM = Math.max(0, Math.round((mockBackfillCum - prevBackfillCum) * 10) / 10);
@@ -1367,13 +1456,10 @@ export async function getHistoricMonthlyProgress(
       const { start: startTs } = dayStartEndPerth(workingDays[0] ?? mo.first);
       const { end: endTs } = dayStartEndPerth(workingDays[workingDays.length - 1] ?? mo.last);
 
-      let pipeQuery = supabase
-        .from("drainer_pipe_records")
-        .select("date_installed")
-        .gte("date_installed", mo.first)
-        .lte("date_installed", mo.last);
-      if (sectionIds.length > 0) pipeQuery = pipeQuery.in("section_id", sectionIds);
-      const { data: pipeRows } = await pipeQuery;
+      const pipeByDay =
+        sectionIds.length > 0
+          ? await pipeMetresByWorkingDayFromChainage(supabase, sectionIds, workingDays)
+          : {};
 
       let pspQuery = supabase
         .from("psp_records")
@@ -1392,12 +1478,7 @@ export async function getHistoricMonthlyProgress(
       }
       const { data: pspRows } = await pspQuery;
 
-      const pipeByDay: Record<string, number> = {};
-      for (const r of pipeRows ?? []) {
-        const d = (r as { date_installed?: string }).date_installed;
-        if (d && workingDays.includes(d)) pipeByDay[d] = (pipeByDay[d] ?? 0) + 1;
-      }
-      const pipeM = Object.values(pipeByDay).reduce((s, c) => s + c * PIPE_LENGTH_M, 0);
+      const pipeM = Object.values(pipeByDay).reduce((s, m) => s + m, 0);
       const backfillByDay = calculateDailyBackfillFromRecords(pspRows ?? [], workingDays);
       const backfillM = Object.values(backfillByDay).reduce((s, v) => s + v, 0);
 

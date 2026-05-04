@@ -309,8 +309,9 @@ export function MonthlyProgressChart({ data, historicData = [], sectionSeries = 
           : defaultTargetMeters;
       const targetMeters = isWaWorkingDay(d.date) ? rangeTargetMeters : 0;
       targetCum += targetMeters;
-      const fittingsForDay = d.pipeMetres / PIPE_LENGTH_M;
-      const actualMetersForDay = Math.round(fittingsForDay * guideMetresPerFitting * 10) / 10;
+      // pipeMetres from server = daily chainage-front delta (true metres), not pipe-count × PIPE_LENGTH_M.
+      const actualMetersForDay = Math.round((d.pipeMetres ?? 0) * 10) / 10;
+      const fittingsForDay = PIPE_LENGTH_M > 0 ? actualMetersForDay / PIPE_LENGTH_M : 0;
       actualCum += actualMetersForDay;
       return {
         ...d,

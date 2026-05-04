@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { checkSuperAdminServiceRole } from "@/lib/super-admin-check";
+import { isDashboardUser } from "@/lib/dashboard-access-check";
 
 function getServiceRoleKey(): string {
   return (
@@ -11,17 +12,32 @@ function getServiceRoleKey(): string {
   );
 }
 
+function createMiddlewareServiceClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  const key = getServiceRoleKey();
+  if (!url || !key) return null;
+  return createServiceClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
+}
+
 async function isSuperAdminForMiddleware(
   userId: string,
   email: string | null,
 ): Promise<boolean> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-  const key = getServiceRoleKey();
-  if (!url || !key) return false;
-  const admin = createServiceClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-  });
+  const admin = createMiddlewareServiceClient();
+  if (!admin) return false;
   return checkSuperAdminServiceRole(admin, userId, email);
+}
+
+/** "/" — session + dashboard app roles only (no /admin super_admin gate). */
+async function hasMainDashboardAccessForMiddleware(
+  userId: string,
+  email: string | null,
+): Promise<boolean> {
+  const admin = createMiddlewareServiceClient();
+  if (!admin) return false;
+  return isDashboardUser(admin, userId, email);
 }
 
 export async function middleware(request: NextRequest) {
@@ -79,6 +95,13 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isMainDashboard) {
+    // Not isSuperAdminForMiddleware: "/" uses isDashboardUser (apa-dashboard roles + super_admin fallback).
+    const allowed = await hasMainDashboardAccessForMiddleware(user.id, user.email ?? null);
+    if (!allowed) {
+      const login = new URL("/login", request.url);
+      login.searchParams.set("error", "no_dashboard_access");
+      return NextResponse.redirect(login);
+    }
     return response;
   }
 
